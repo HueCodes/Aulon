@@ -1,0 +1,16 @@
+[package]
+name = "aulon-bench"
+description = "HDR-histogram-aware benchmark client for Aulon."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "aulon-bench"
+path = "src/main.rs"
+
+[lints]
+workspace = true
