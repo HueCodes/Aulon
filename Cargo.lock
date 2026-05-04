@@ -9,6 +9,9 @@ version = "0.0.1"
 [[package]]
 name = "aulon-core"
 version = "0.0.1"
+dependencies = [
+ "monoio",
+]
 
 [[package]]
 name = "aulon-proto"
@@ -18,6 +21,7 @@ version = "0.0.1"
 name = "aulon-server"
 version = "0.0.1"
 dependencies = [
+ "aulon-core",
  "monoio",
 ]
 

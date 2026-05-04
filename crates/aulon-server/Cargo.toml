@@ -13,6 +13,7 @@ name = "aulon-server"
 path = "src/main.rs"
 
 [dependencies]
+aulon-core = { path = "../aulon-core" }
 monoio = { workspace = true }
 
 [lints]
