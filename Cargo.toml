@@ -15,6 +15,9 @@ repository = "https://github.com/HueCodes/aulon"
 authors = ["Hugh Ryan <hugh.t.ryan@gmail.com>"]
 rust-version = "1.85"
 
+[workspace.dependencies]
+monoio = { version = "0.2" }
+
 [workspace.lints.rust]
 unsafe_code = "deny"
 missing_docs = "warn"
