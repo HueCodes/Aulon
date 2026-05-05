@@ -62,31 +62,32 @@ fn header_only<'a>(frame: Frame<'a>, rest: &[u8], header_total: usize) -> ParseO
 }
 
 fn parse_err(rest: &[u8], header_total: usize) -> ParseOutcome<'_> {
-    let message = trim_leading_spaces(rest);
+    // `rest` is the message verbatim; `split_verb` already consumed the
+    // single separator that follows `-ERR`. We do NOT trim further
+    // leading whitespace because the message itself may legitimately
+    // start with a space (the codec must round-trip such messages).
     ParseOutcome::Frame {
-        frame: Frame::Err { message },
+        frame: Frame::Err { message: rest },
         consumed: header_total,
     }
 }
 
 fn parse_connect(rest: &[u8], header_total: usize) -> ParseOutcome<'_> {
-    let options = trim_leading_spaces(rest);
-    if options.is_empty() {
+    if rest.is_empty() {
         return ParseOutcome::Err(ParseError::BadHeader);
     }
     ParseOutcome::Frame {
-        frame: Frame::Connect { options },
+        frame: Frame::Connect { options: rest },
         consumed: header_total,
     }
 }
 
 fn parse_info(rest: &[u8], header_total: usize) -> ParseOutcome<'_> {
-    let options = trim_leading_spaces(rest);
-    if options.is_empty() {
+    if rest.is_empty() {
         return ParseOutcome::Err(ParseError::BadHeader);
     }
     ParseOutcome::Frame {
-        frame: Frame::Info { options },
+        frame: Frame::Info { options: rest },
         consumed: header_total,
     }
 }
@@ -225,8 +226,14 @@ fn find_crlf(buf: &[u8]) -> Option<usize> {
 }
 
 fn split_verb(line: &[u8]) -> (&[u8], &[u8]) {
+    // Consume exactly one separator byte after the verb. Verb parsers
+    // for `-ERR` / `CONNECT` / `INFO` then take `rest` verbatim as the
+    // message / JSON body, preserving any leading whitespace that
+    // legitimately belongs to the payload. Multi-token verbs
+    // (`SUB`, `PUB`, …) drive `TokenIter`, which strips additional
+    // leading whitespace before each token.
     match line.iter().position(|b| *b == b' ' || *b == b'\t') {
-        Some(idx) => (&line[..idx], &line[idx..]),
+        Some(idx) => (&line[..idx], &line[idx + 1..]),
         None => (line, &[]),
     }
 }
