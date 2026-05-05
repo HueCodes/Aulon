@@ -27,15 +27,33 @@ use tokio_uring::net::{TcpListener, TcpStream};
 
 const LISTEN_ADDR: &str = "127.0.0.1:4222";
 
+/// Advertised and enforced maximum payload size. Matches `nats-server`'s
+/// default; `SERVER_INFO_JSON` advertises this same number so clients
+/// will refuse to send larger PUBs locally.
+const MAX_PAYLOAD_BYTES: usize = 1024 * 1024;
+
+/// Maximum total frame size on the read accumulator before we reject the
+/// connection with a protocol error. A publisher's `PUB` is the largest
+/// possible frame: `PUB <subject> [reply] <#bytes>\r\n<payload>\r\n`.
+/// Cap at 2 × `MAX_PAYLOAD_BYTES` to give the header generous headroom
+/// and protect against a malicious client that streams bytes without
+/// ever terminating a frame.
+const MAX_FRAME_SIZE: usize = MAX_PAYLOAD_BYTES * 2;
+
+/// Per-worker heap-allocated emit scratch buffer. Sized to fit one
+/// encoded `MSG` at the maximum payload, plus header. One allocation
+/// at startup; reused for the lifetime of the worker.
+const EMIT_SCRATCH_CAPACITY: usize = MAX_PAYLOAD_BYTES + 4096;
+
 /// Minimal `INFO` greeting body. Real `nats-server` includes more fields
 /// (`server_id`, version, etc.); the official `nats` CLI is forgiving as
 /// long as the JSON is well-formed and the protocol version is set.
 const SERVER_INFO_JSON: &[u8] = br#"{"server_id":"aulon","server_name":"aulon","version":"0.0.1","host":"127.0.0.1","port":4222,"max_payload":1048576,"proto":1,"headers":false,"jetstream":false}"#;
 
-/// Stack buffer size for emitting one frame at a time on the hot path.
-/// Sized to match the buffer pool's per-connection buffer; nothing we
-/// emit (INFO, MSG with up to 4 KiB payload, -ERR, PONG) exceeds this.
-const STACK_EMIT_BUF: usize = 4096;
+/// Stack buffer size for emitting short control frames (INFO, PONG,
+/// `-ERR`). Distinct from the per-worker MSG scratch (which is heap-
+/// allocated and large enough for the full `MAX_PAYLOAD_BYTES`).
+const SHORT_FRAME_BUF: usize = 4096;
 
 /// Per-worker shared state. The single `tokio_uring` thread owns one
 /// instance; reader and writer tasks hold an `Rc<Worker>`.
@@ -44,15 +62,22 @@ struct Worker {
     table: RefCell<SubscriptionTable>,
     connections: RefCell<HashMap<ConnectionId, Rc<ConnectionState>>>,
     next_conn_id: Cell<u32>,
+    /// Pre-allocated MSG-encoding scratch. Heap-allocated once at
+    /// startup; resized to its capacity so direct slice indexing is
+    /// always in bounds. Each `PUB` fanout `clear()`s it then writes
+    /// the encoded MSG once per subscriber. No allocator is touched.
+    emit_scratch: RefCell<Vec<u8>>,
 }
 
 impl Worker {
     fn new() -> Self {
+        let emit_scratch = vec![0u8; EMIT_SCRATCH_CAPACITY];
         Self {
             pool: BufferPool::new(DEFAULT_POOL_CAPACITY, DEFAULT_BUFFER_SIZE),
             table: RefCell::new(SubscriptionTable::new()),
             connections: RefCell::new(HashMap::new()),
             next_conn_id: Cell::new(0),
+            emit_scratch: RefCell::new(emit_scratch),
         }
     }
 
@@ -120,7 +145,7 @@ async fn reader_task(
 ) {
     // 1. Send INFO greeting before reading anything.
     {
-        let mut emit_buf = [0u8; STACK_EMIT_BUF];
+        let mut emit_buf = [0u8; SHORT_FRAME_BUF];
         let Ok(n) = emit_info(&mut emit_buf, SERVER_INFO_JSON) else {
             state.mark_close(CloseReason::ProtocolError);
             return;
@@ -143,6 +168,14 @@ async fn reader_task(
         };
 
         accum.extend_from_slice(&read_buf[..n]);
+        if accum.len() > MAX_FRAME_SIZE {
+            // A pathological client is streaming bytes without ever
+            // terminating a frame, or sending a single oversized frame.
+            // Drop the connection rather than let the accumulator grow
+            // without bound.
+            state.mark_close(CloseReason::ProtocolError);
+            break;
+        }
         let mut consumed_total = 0usize;
         loop {
             let outcome = parse_frame(&accum[consumed_total..]);
@@ -280,6 +313,10 @@ fn handle_frame(
             reply_to,
             payload,
         } => {
+            if payload.len() > MAX_PAYLOAD_BYTES {
+                emit_err_to(state, b"maximum payload exceeded");
+                return;
+            }
             // Snapshot the matching subscriber list under a short borrow
             // so the publish loop is free to call `enqueue` on
             // ConnectionStates (which the subscription table does not
@@ -300,13 +337,18 @@ fn handle_frame(
                     .map(|sub| (sub.conn_id, sub.sid.clone()))
                     .collect()
             };
+            // Use the worker's pre-allocated scratch for MSG encoding;
+            // sized to fit the full MAX_PAYLOAD_BYTES + header overhead.
+            // No reallocation happens here — capacity is fixed at startup.
+            let mut scratch = worker.emit_scratch.borrow_mut();
             for (sub_conn_id, sub_sid) in &sub_list {
-                let mut emit_buf = [0u8; STACK_EMIT_BUF];
-                let Ok(n) = emit_msg(&mut emit_buf, subject, sub_sid, reply_to, payload) else {
+                let Ok(n) = emit_msg(&mut scratch, subject, sub_sid, reply_to, payload) else {
+                    // Should not happen given MAX_PAYLOAD_BYTES check above;
+                    // skip rather than panic if the assumption is ever wrong.
                     continue;
                 };
                 if let Some(target) = worker.lookup(*sub_conn_id) {
-                    target.enqueue(&emit_buf[..n]);
+                    target.enqueue(&scratch[..n]);
                 }
             }
         }
@@ -318,7 +360,7 @@ fn handle_frame(
 }
 
 fn emit_err_to(state: &Rc<ConnectionState>, msg: &[u8]) {
-    let mut buf = [0u8; STACK_EMIT_BUF];
+    let mut buf = [0u8; SHORT_FRAME_BUF];
     if let Ok(n) = emit_err(&mut buf, msg) {
         state.enqueue(&buf[..n]);
     }
