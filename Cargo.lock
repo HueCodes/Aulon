@@ -53,6 +53,7 @@ name = "aulon-server"
 version = "0.0.1"
 dependencies = [
  "aulon-core",
+ "aulon-proto",
  "tokio-uring",
 ]
 

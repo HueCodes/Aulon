@@ -40,15 +40,22 @@ impl std::fmt::Debug for BufferPool {
 }
 
 impl BufferPool {
-    /// Allocates `capacity` buffers of `buffer_size` bytes each. Buffers are
-    /// uninitialised vectors with the requested capacity (and length 0); the
-    /// kernel writes into them during `read_fixed` operations.
+    /// Allocates `capacity` buffers of `buffer_size` bytes each. Each
+    /// buffer is created as a zero-filled `Vec<u8>` of length
+    /// `buffer_size`, so [`tokio_uring::buf::fixed::FixedBuf`] handles
+    /// have `bytes_init() == buffer_size` from acquisition. This means
+    /// `DerefMut` exposes the full buffer for safe `copy_from_slice`
+    /// — required by the writer-task hot path that copies outbound
+    /// bytes into the buffer before `write_fixed_all`. The alternative
+    /// (calling `unsafe set_init` after acquisition) is excluded by
+    /// `aulon-core`'s `unsafe_code = "deny"` policy outside the driver
+    /// module.
     ///
     /// This does not register the buffers with `io_uring`; call
     /// [`register`](Self::register) inside a `tokio_uring` runtime to do so.
     #[must_use]
     pub fn new(capacity: usize, buffer_size: usize) -> Self {
-        let bufs = (0..capacity).map(|_| Vec::with_capacity(buffer_size));
+        let bufs = (0..capacity).map(|_| vec![0u8; buffer_size]);
         Self {
             inner: FixedBufPool::new(bufs),
             buffer_size,

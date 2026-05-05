@@ -29,15 +29,22 @@ pub enum CloseReason {
     SlowConsumer,
     /// The reader task observed a malformed frame on the wire.
     ProtocolError,
+    /// Peer disconnected (or read returned an unrecoverable error). The
+    /// writer task should drain whatever is pending and exit without
+    /// emitting a `-ERR` frame.
+    PeerClosed,
 }
 
 impl CloseReason {
-    /// Human-readable text suitable for emitting in a `-ERR` frame.
+    /// Text for the `-ERR` frame the writer task emits before closing,
+    /// or `None` if no `-ERR` should be sent (e.g., the peer is already
+    /// gone).
     #[must_use]
-    pub fn err_text(self) -> &'static [u8] {
+    pub fn err_text(self) -> Option<&'static [u8]> {
         match self {
-            Self::SlowConsumer => b"slow consumer",
-            Self::ProtocolError => b"protocol error",
+            Self::SlowConsumer => Some(b"slow consumer"),
+            Self::ProtocolError => Some(b"protocol error"),
+            Self::PeerClosed => None,
         }
     }
 }
@@ -270,7 +277,14 @@ mod tests {
 
     #[test]
     fn close_reason_text_is_stable() {
-        assert_eq!(CloseReason::SlowConsumer.err_text(), b"slow consumer");
-        assert_eq!(CloseReason::ProtocolError.err_text(), b"protocol error");
+        assert_eq!(
+            CloseReason::SlowConsumer.err_text(),
+            Some(&b"slow consumer"[..])
+        );
+        assert_eq!(
+            CloseReason::ProtocolError.err_text(),
+            Some(&b"protocol error"[..])
+        );
+        assert_eq!(CloseReason::PeerClosed.err_text(), None);
     }
 }

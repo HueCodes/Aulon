@@ -68,18 +68,18 @@ no `Box`.
 
 ```text
 Per worker:
-    pool:           BufferPool                  // existing, registered with io_uring
-    encode_scratch: Vec<u8>                     // grow once, clear-and-reuse
-    connections:    Slab<ConnectionState>       // indexed by ConnectionId
-    table:          SubscriptionTable           // exact-match flat hashmap (routing-v1.md)
+    pool:        BufferPool                              // registered fixed buffers
+    table:       RefCell<SubscriptionTable>              // routing-v1.md
+    connections: RefCell<HashMap<ConnectionId, Rc<ConnectionState>>>
+    next_id:     Cell<u32>
 
-Per connection (ConnectionState):
-    outbound_data:  Box<[u8]>                   // pre-allocated, default 256 KiB
-    outbound_head:  Cell<usize>                 // writer's read cursor
-    outbound_tail:  Cell<usize>                 // publishers' write cursor
-    notify:         Rc<Notify>                  // wake the writer on enqueue / close
-    close_with:     Cell<Option<CloseReason>>   // SlowConsumer / ProtocolError
-    id:             ConnectionId
+Per connection (ConnectionState, held by reader and writer tasks):
+    outbound_data: Box<[Cell<u8>]>               // pre-allocated, default 256 KiB
+    outbound_head: Cell<usize>                   // writer's read cursor
+    outbound_tail: Cell<usize>                   // publishers' write cursor
+    notify:        tokio::sync::Notify           // wake the writer on enqueue / close
+    close_with:    Cell<Option<CloseReason>>     // SlowConsumer / ProtocolError / PeerClosed
+    id:            ConnectionId
 ```
 
 `Cell<usize>` is sound here because the worker is `!Send`: head and
@@ -91,25 +91,28 @@ the reader, nothing more.
 
 ```text
 fn publish(worker, subject_bytes, reply_to, payload_bytes):
-    1. worker.encode_scratch.clear()
-    2. emit_msg_into(&mut worker.encode_scratch, subject_bytes, sid, reply_to, payload_bytes)
-    3. for sub in worker.table.subscribers_of(subject_bytes):
+    let mut emit_buf: [u8; 4096]   // stack-allocated, per-call
+    for sub in worker.table.subscribers_of(subject_bytes):
         let conn = &worker.connections[sub.conn_id]
-        let needed = worker.encode_scratch.len()
-        let pending = conn.outbound_tail.get() - conn.outbound_head.get()
-        if pending + needed > conn.outbound_data.len():
-            conn.close_with.set(Some(CloseReason::SlowConsumer))
-            conn.notify.notify_one()
-            continue
-        let tail = conn.outbound_tail.get()
-        conn.outbound_data[tail..tail+needed].copy_from_slice(&worker.encode_scratch)
-        conn.outbound_tail.set(tail + needed)
-        conn.notify.notify_one()
+        // Each MSG embeds the *subscriber's* sid, so the bytes differ
+        // per subscriber and must be re-emitted N times. The encoding
+        // is cheap (~20 ns per call in C2 micro-benches) and uses a
+        // stack buffer; no heap allocation is involved.
+        let n = emit_msg(&mut emit_buf, subject_bytes, &sub.sid, reply_to, payload_bytes)
+        conn.enqueue(&emit_buf[..n])  // EnqueueOutcome::SlowConsumerClosed
+                                      // marks subscriber for close on overflow;
+                                      // publisher just continues with the next sub.
 ```
 
-The only steps that touch memory are `clear`, `emit_msg_into` (writes
-into the existing `Vec`), and `copy_from_slice` (writes into the existing
-`Box<[u8]>`). No allocator is involved.
+The only steps that touch memory are the stack-buffer encode and the
+`copy_from_slice` inside `enqueue` (writes into an existing
+`Box<[Cell<u8>]>` per connection). No allocator is involved.
+
+An earlier draft of this doc claimed an "encode-once, copy-to-N-
+subscribers" optimisation. That was wrong — `MSG` embeds the
+subscriber's own `sid` in the header, so the encoded bytes genuinely
+differ per subscriber. The optimisation does not exist for the wire
+protocol we ship; the per-subscriber re-emit is the lower bound.
 
 To keep the byte-stream model simple, **the outbound buffer does not
 wrap**. When `tail` reaches `outbound_data.len()`, the writer drains

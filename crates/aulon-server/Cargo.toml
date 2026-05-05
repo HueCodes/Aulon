@@ -14,6 +14,7 @@ path = "src/main.rs"
 
 [dependencies]
 aulon-core = { path = "../aulon-core" }
+aulon-proto = { path = "../aulon-proto" }
 tokio-uring = { workspace = true }
 
 [lints]
