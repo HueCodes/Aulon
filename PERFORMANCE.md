@@ -176,3 +176,25 @@ These numbers are the floor for downstream NATS-handler latency; the
 server's per-frame work in C2 layers on top of this. The codec budget
 inside a 25 µs single-core RTT is well under 1 % at any reasonable
 payload size.
+
+## C2 nats CLI smoke — 2026-05-04
+
+Official `nats` CLI v0.4.0 (the upstream NATS reference client) runs
+unmodified against Aulon. Reproducer inside the VM:
+
+```
+/tmp/aulon-target/debug/aulon-server &
+nats sub -s nats://127.0.0.1:4222 foo --count 1 &
+nats pub -s nats://127.0.0.1:4222 foo "hello from nats CLI"
+```
+
+Output:
+
+```
+20:23:13 Subscribing on foo
+[#1] Received on "foo"
+hello from nats CLI
+```
+
+Reference-client compatibility on the gate's verb subset (`CONNECT`,
+`SUB`, `PUB`, `MSG`, `PING`, `PONG`) is now established.
