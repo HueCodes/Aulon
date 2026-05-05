@@ -1,7 +1,7 @@
 //! Typestate-encoded connection lifecycle.
 //!
 //! See `docs/design/connection-lifecycle.md` for the rationale. In C1 only
-//! [`Active`] and [`Closing`] are real types; [`Negotiating`] lands in C2
+//! [`Active`] and [`Closing`] are real types; `Negotiating` lands in C2
 //! when the NATS `CONNECT` exchange is implemented.
 
 use std::fmt;

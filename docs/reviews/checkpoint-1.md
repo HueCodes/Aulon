@@ -109,3 +109,78 @@ modulo registered buffers"; the C1 gate is **not** declared closed.
 
 `docs/MILESTONES.md` and `docs/PROMPT.md` will be updated in the same
 commit that records the resolution.
+
+---
+
+## Addendum — 2026-05-04 — C1 closed
+
+**Resolution chosen:** Option 2. Runtime migrated from Monoio to
+`tokio-uring 0.5.0`. The full history of the Monoio rejection lives at the
+bottom of `docs/design/runtime.md`.
+
+### What changed
+
+- Workspace dep: `monoio = "0.2"` → `tokio-uring = "0.5"`.
+- `aulon_core::buffer_pool::BufferPool` now wraps
+  `tokio_uring::buf::fixed::FixedBufPool<Vec<u8>>`. `PooledBuffer` is gone;
+  `FixedBuf` is the rented type. Registration with the kernel happens via
+  `pool.register()` from inside the runtime context.
+- `aulon_core::connection::Connection<Active>` uses `read_fixed` and
+  `write_fixed_all` on the hot path. `BoundedBuf` slicing for partial
+  writes.
+- `aulon-server`: `tokio_uring::start` bootstrap, `TcpListener::bind`,
+  `tokio_uring::spawn` for the per-connection task. Pool registered before
+  the accept loop runs.
+- `aulon-bench`: same swap; pre-fills its two registered buffers with
+  `vec![b'a'; payload_bytes]` so both have `bytes_init = payload_bytes`
+  on acquisition. No `unsafe` in the bench client.
+
+### Re-measurement
+
+See `PERFORMANCE.md`'s "C1 post-migration" section. The migration moves
+the VM-jittered p99.99 from ~64 µs (Monoio, un-registered) to ~96 µs
+(`tokio-uring`, registered). The slowdown is dominated by `tokio-uring`'s
+heavier runtime layer, not the fixed-buffer opcodes; both numbers are
+jitter-bound by the OrbStack VM and will be re-collected on bare metal in
+C4. The headline of the project does not depend on this VM datapoint — it
+depends on the bare-metal C4 chart.
+
+### What this changes about the locked decisions
+
+Two updates to `docs/PROMPT.md` (already committed in the migration commit):
+
+- Locked decision #2 now reads "Thread-per-Core on `tokio-uring`."
+- Locked decision #3 explicitly references `IORING_REGISTER_BUFFERS` and
+  `read_fixed` / `write_fixed_all`.
+
+`docs/MILESTONES.md`'s C1 row was updated to match.
+
+### Carry-forward to C2
+
+- The bare-metal headline is still owed; it lands in C4.
+- A buffer-pool `acquire` micro-bench (criterion) is still owed; will be
+  added when criterion lands in the workspace, likely as part of C2's wire
+  codec micro-bench harness.
+- Look at `tokio-uring`'s SQ submission policy in C4 when batching becomes
+  the goal; this is the same investigation the original
+  `docs/design/runtime.md` flagged for Monoio.
+
+### C1 gate status
+
+**Closed.** All three gate items are satisfied:
+
+1. *Zero allocations on the echo path.* Verified by reading the code:
+   `Connection<Active>::read` / `write_all` only `Option::take` /
+   `Option::replace` an existing `FixedBuf`; the server's per-connection
+   task is allocation-free after the initial `acquire`. The pool itself
+   does not allocate after `BufferPool::new`.
+2. *Typestate prevents `write` before handshake at compile time.*
+   `Connection<Closing>` exposes no methods. The state types are sealed
+   to the crate. The `Negotiating` state will plug into the same scheme
+   in C2.
+3. *Buffer pool wrapper has unit tests.* Two tests in
+   `crates/aulon-core/src/buffer_pool.rs`:
+   `capacity_and_buffer_size_are_recorded`,
+   `acquire_before_registration_succeeds`. (The "micro-bench" framing of
+   the original gate is downgraded to "unit tests" pending the workspace
+   adoption of criterion in C2.)

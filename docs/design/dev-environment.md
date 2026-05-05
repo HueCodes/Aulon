@@ -6,14 +6,14 @@ Aulon is built and tested on Linux. Daily development happens inside an OrbStack
 
 ## Why
 
-Monoio is Linux-only. It depends on `io_uring` and `libc` syscalls that have no equivalent on macOS or Windows. There is no cross-platform `cfg`-gated fallback that would preserve the runtime's identity. So the project is Linux-first by construction.
+`tokio-uring` (and `io_uring` itself) is Linux-only. It depends on syscalls that have no equivalent on macOS or Windows. There is no cross-platform `cfg`-gated fallback that would preserve the runtime's identity. So the project is Linux-first by construction.
 
 ## Local layout
 
 - Working tree on macOS at `/Users/hugh/Dev/projects/Aulon`.
 - OrbStack auto-mounts the macOS user home into the VM at the same path. No `rsync` or `Mutagen` needed.
 - VM-side build artifacts live in `/tmp/aulon-target` (set via `CARGO_TARGET_DIR`) so the macOS host's `target/` is not polluted by Linux objects and vice versa.
-- macOS host can also run `cargo build` for any crate that does not depend on Monoio. `aulon-proto` is no-std-clean and pure Rust, so it builds and tests on macOS. `aulon-core`, `aulon-server`, and `aulon-bench` build only inside the VM once Monoio lands in C1.
+- macOS host can also run `cargo build` for any crate that does not depend on `tokio-uring`. `aulon-proto` is no-std-clean and pure Rust, so it builds and tests on macOS. `aulon-core`, `aulon-server`, and `aulon-bench` build only inside the VM.
 
 ## Standard commands
 

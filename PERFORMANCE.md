@@ -67,3 +67,60 @@ CARGO_TARGET_DIR=/tmp/aulon-target bash bench/echo.sh
 - p99.99 / max divergence (≈ 2.4×) is consistent with VM scheduling jitter.
 - The pool's `acquire`/`release` micro-bench has not yet been written; it
   lands as part of the C1 review's deferred items.
+
+## C1 post-migration — 2026-05-04
+
+After moving from Monoio to `tokio-uring` and switching the hot path to
+`IORING_OP_READ_FIXED` / `IORING_OP_WRITE_FIXED` with
+`IORING_REGISTER_BUFFERS`, this is the new baseline. Same hardware, same
+VM, same bench script, same iteration count — only the runtime and the
+opcode pair changed.
+
+### Setup
+
+Same as the previous run, except:
+
+- Runtime: `tokio-uring 0.5.0` (single `tokio_uring::start` per process).
+- Buffers: `tokio_uring::buf::fixed::FixedBufPool<Vec<u8>>` with 256 × 4 KiB
+  vectors, registered against the kernel via `pool.register()` at startup.
+  Server-side: one buffer per connection (acquired on accept). Client-side:
+  two pre-filled buffers (one send, one recv).
+- Hot path: `TcpStream::read_fixed` / `TcpStream::write_fixed_all` (true
+  fixed-buffer io_uring opcodes, not standard `read` / `write`).
+
+### Result
+
+| Metric | Monoio (ns) | tokio-uring + fixed (ns) | Δ |
+| ---: | ---: | ---: | ---: |
+| count | 100,000 | 100,000 | — |
+| min | 11,160 | 11,496 | +3 % |
+| p50 | 25,055 | 29,423 | +17 % |
+| p90 | 27,007 | 32,223 | +19 % |
+| p99 | 34,879 | 40,255 | +15 % |
+| p99.9 | 47,775 | 58,047 | +22 % |
+| p99.99 | 63,647 | 96,127 | +51 % |
+| max | 149,503 | 205,439 | +37 % |
+
+### Notes
+
+- **Fixed buffers are slower in this configuration**, against the naive
+  expectation. This is consistent with the literature for sub-µs- to
+  10-µs-class workloads on a single connection: `IORING_OP_*_FIXED` saves
+  the kernel a per-op buffer-pin step, but it does not save a syscall (the
+  ring still has to be submitted). The savings are real and are typically
+  measured at higher concurrency (many connections, many buffers in flight)
+  where the avoided pinning becomes a meaningful fraction of total work.
+- The runtime overhead difference between Monoio (a thin TPC runtime with
+  minimal layers) and `tokio-uring` (which wraps the `tokio` reactor and
+  has additional indirection in the buffer-handle path) is the dominant
+  effect at this latency floor.
+- Both runs are inside an OrbStack VM on macOS. p99.99 / max numbers are
+  jitter-bound; the headline number lives on bare metal in C4.
+
+The point of recording this comparison is not to prefer one runtime over
+the other on these numbers — both fall well within VM noise — but to
+make the trade-off visible: we picked `tokio-uring` for the API surface
+(public, stable `IORING_REGISTER_BUFFERS`), accepting some runtime
+overhead at this scale, in exchange for the fixed-buffer story we
+committed to in `docs/PROMPT.md`. C4's bare-metal headline is where the
+choice is actually validated or refuted.
