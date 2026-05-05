@@ -24,10 +24,15 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(not(test), no_std)]
 
+pub mod emit;
 pub mod error;
 pub mod frame;
 pub mod parse;
 
+pub use emit::{
+    emit_connect, emit_err, emit_frame, emit_info, emit_msg, emit_ok, emit_ping, emit_pong,
+    emit_pub, emit_sub, emit_unsub,
+};
 pub use error::{EmitError, ParseError};
 pub use frame::Frame;
 pub use parse::{parse_frame, ParseOutcome};
