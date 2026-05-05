@@ -19,7 +19,12 @@ use tokio::sync::Notify;
 use crate::subscription::ConnectionId;
 
 /// Default per-connection outbound buffer capacity.
-pub const DEFAULT_OUTBOUND_CAPACITY: usize = 256 * 1024;
+///
+/// Sized to comfortably hold a few `MAX_PAYLOAD_BYTES` MSGs in flight per
+/// subscriber so a moderately bursty publisher does not trigger slow-
+/// consumer eviction on a healthy reader. Tunable per-connection via
+/// [`ConnectionState::new`]; 2 MiB is the v1 default.
+pub const DEFAULT_OUTBOUND_CAPACITY: usize = 2 * 1024 * 1024;
 
 /// Why a connection is being closed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

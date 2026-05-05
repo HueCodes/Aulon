@@ -221,7 +221,8 @@ async fn reader_task(
 /// Writer task. Owns the outbound `FixedBuf`. Awaits notifications from
 /// `ConnectionState`; on each wake, drains any pending bytes via
 /// `write_fixed_all`. When `close_reason` is set, emits the
-/// corresponding `-ERR` (if any) and exits.
+/// corresponding `-ERR` (if any), shuts the socket down so the reader
+/// task's pending `read_fixed` resolves with EOF, and exits.
 async fn writer_task(stream: Rc<TcpStream>, state: Rc<ConnectionState>, write_buf: FixedBuf) {
     let mut buf = write_buf;
     loop {
@@ -236,6 +237,7 @@ async fn writer_task(stream: Rc<TcpStream>, state: Rc<ConnectionState>, write_bu
             let (res, slice) = stream.write_fixed_all(buf.slice(..n)).await;
             buf = slice.into_inner();
             if res.is_err() {
+                let _ = stream.shutdown(std::net::Shutdown::Both);
                 drop(buf);
                 return;
             }
@@ -249,6 +251,12 @@ async fn writer_task(stream: Rc<TcpStream>, state: Rc<ConnectionState>, write_bu
                     buf = slice.into_inner();
                 }
             }
+            // Shut the socket down so the reader task's outstanding
+            // `read_fixed` returns with 0 bytes and the connection is
+            // fully cleaned up. Without this, a writer-initiated close
+            // (e.g. slow consumer) would leave the reader pinned on a
+            // never-completing read and the peer never seeing FIN.
+            let _ = stream.shutdown(std::net::Shutdown::Both);
             drop(buf);
             return;
         }
