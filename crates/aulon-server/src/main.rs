@@ -17,10 +17,11 @@ use std::net::SocketAddr;
 use std::rc::Rc;
 
 use aulon_core::{
-    BufferPool, CloseReason, ConnectionId, ConnectionState, Sub, SubscriptionTable,
+    BufferPool, CloseReason, ConnectionId, ConnectionState, Sub, SubscriptionTrie,
     DEFAULT_BUFFER_SIZE, DEFAULT_OUTBOUND_CAPACITY, DEFAULT_POOL_CAPACITY,
 };
 use aulon_proto::{emit_err, emit_info, emit_msg, emit_pong, parse_frame, Frame, ParseOutcome};
+use smallvec::SmallVec;
 use tokio_uring::buf::fixed::FixedBuf;
 use tokio_uring::buf::BoundedBuf;
 use tokio_uring::net::{TcpListener, TcpStream};
@@ -55,18 +56,43 @@ const SERVER_INFO_JSON: &[u8] = br#"{"server_id":"aulon","server_name":"aulon","
 /// allocated and large enough for the full `MAX_PAYLOAD_BYTES`).
 const SHORT_FRAME_BUF: usize = 4096;
 
+/// One match collected for the queue-group dispatch step. Borrowed
+/// from the trie's `Sub` only long enough to clone the few bytes we
+/// need (`sid` and `queue_group`), so the trie's `RefCell` borrow is
+/// released before any `enqueue` call.
+type Snapshot = (ConnectionId, Box<[u8]>);
+
+/// One queue-group bucket: the group name plus its candidate
+/// subscribers for the current publish.
+type GroupBucket = (Box<[u8]>, SmallVec<[Snapshot; PUB_INLINE_GROUP]>);
+
+/// Inline capacity for the per-PUB plain-subscriber list. 8 covers
+/// the common case (small fanouts); larger fanouts spill to the heap.
+const PUB_INLINE_PLAIN: usize = 8;
+/// Inline capacity for one queue-group bucket.
+const PUB_INLINE_GROUP: usize = 4;
+/// Inline capacity for the list of distinct queue groups on a single
+/// publish. Linear scan is faster than a `HashMap` while this stays
+/// small, which it does in real workloads.
+const PUB_INLINE_GROUPS: usize = 4;
+
 /// Per-worker shared state. The single `tokio_uring` thread owns one
 /// instance; reader and writer tasks hold an `Rc<Worker>`.
 struct Worker {
     pool: BufferPool,
-    table: RefCell<SubscriptionTable>,
+    table: RefCell<SubscriptionTrie>,
     connections: RefCell<HashMap<ConnectionId, Rc<ConnectionState>>>,
     next_conn_id: Cell<u32>,
     /// Pre-allocated MSG-encoding scratch. Heap-allocated once at
     /// startup; resized to its capacity so direct slice indexing is
-    /// always in bounds. Each `PUB` fanout `clear()`s it then writes
-    /// the encoded MSG once per subscriber. No allocator is touched.
+    /// always in bounds. Each `PUB` fanout writes the encoded MSG
+    /// into this buffer once per delivery. No allocator is touched.
     emit_scratch: RefCell<Vec<u8>>,
+    /// xorshift64 PRNG state for queue-group dispatch. Per-worker so
+    /// the picks are independent across cores once C4 lands. Seeded
+    /// at construction with a non-zero constant; entropy quality is
+    /// not load-bearing — fairness within a worker is.
+    rng: Cell<u64>,
 }
 
 impl Worker {
@@ -74,10 +100,11 @@ impl Worker {
         let emit_scratch = vec![0u8; EMIT_SCRATCH_CAPACITY];
         Self {
             pool: BufferPool::new(DEFAULT_POOL_CAPACITY, DEFAULT_BUFFER_SIZE),
-            table: RefCell::new(SubscriptionTable::new()),
+            table: RefCell::new(SubscriptionTrie::new()),
             connections: RefCell::new(HashMap::new()),
             next_conn_id: Cell::new(0),
             emit_scratch: RefCell::new(emit_scratch),
+            rng: Cell::new(0x1234_5678_9abc_def0),
         }
     }
 
@@ -89,6 +116,24 @@ impl Worker {
 
     fn lookup(&self, id: ConnectionId) -> Option<Rc<ConnectionState>> {
         self.connections.borrow().get(&id).cloned()
+    }
+
+    /// Picks an index in `0..n` using the worker's xorshift64 stream.
+    /// `n` must be non-zero; the queue-group dispatch only calls this
+    /// for non-empty buckets.
+    fn pick_index(&self, n: usize) -> usize {
+        debug_assert!(n > 0);
+        let mut s = self.rng.get();
+        s ^= s << 13;
+        s ^= s >> 7;
+        s ^= s << 17;
+        self.rng.set(s);
+        // The mod-n result fits in usize on every supported target;
+        // truncation here is the desired narrowing of a 64-bit
+        // xorshift output into an index, not a precision loss.
+        #[allow(clippy::cast_possible_truncation)]
+        let truncated = s as usize;
+        truncated % n
     }
 }
 
@@ -289,20 +334,18 @@ fn handle_frame(
             queue_group,
             sid,
         } => {
-            if queue_group.is_some() {
-                emit_err_to(state, b"queue groups not supported in v1");
-                return;
-            }
             let sid_box: Box<[u8]> = sid.into();
             let subject_box: Box<[u8]> = subject.into();
-            subscriptions.insert(sid_box.clone(), subject_box);
-            worker.table.borrow_mut().subscribe(
-                subject,
-                Sub {
-                    conn_id: state.id(),
-                    sid: sid_box,
-                },
-            );
+            let new_sub = Sub {
+                conn_id: state.id(),
+                sid: sid_box.clone(),
+                queue_group: queue_group.map(Into::into),
+            };
+            if let Err(e) = worker.table.borrow_mut().subscribe(subject, new_sub) {
+                emit_err_to(state, subject_error_text(e));
+                return;
+            }
+            subscriptions.insert(sid_box, subject_box);
         }
         Frame::Unsub { sid, max_msgs } => {
             if max_msgs.is_some() {
@@ -325,40 +368,7 @@ fn handle_frame(
                 emit_err_to(state, b"maximum payload exceeded");
                 return;
             }
-            // Snapshot the matching subscriber list under a short borrow
-            // so the publish loop is free to call `enqueue` on
-            // ConnectionStates (which the subscription table does not
-            // own; no aliasing risk).
-            //
-            // HOT-PATH ALLOC: `sub_list` is the only heap allocation on
-            // the publish path. One Box clone per matching subscriber.
-            // The alternative — calling `enqueue` while the
-            // SubscriptionTable RefCell is borrowed — is sound today
-            // (no handler re-enters the table) but the invariant is
-            // fragile; the snapshot keeps the borrow tight. C3 will
-            // revisit this with a callback-based fanout.
-            let sub_list: Vec<(ConnectionId, Box<[u8]>)> = {
-                let table = worker.table.borrow();
-                table
-                    .subscribers(subject)
-                    .iter()
-                    .map(|sub| (sub.conn_id, sub.sid.clone()))
-                    .collect()
-            };
-            // Use the worker's pre-allocated scratch for MSG encoding;
-            // sized to fit the full MAX_PAYLOAD_BYTES + header overhead.
-            // No reallocation happens here — capacity is fixed at startup.
-            let mut scratch = worker.emit_scratch.borrow_mut();
-            for (sub_conn_id, sub_sid) in &sub_list {
-                let Ok(n) = emit_msg(&mut scratch, subject, sub_sid, reply_to, payload) else {
-                    // Should not happen given MAX_PAYLOAD_BYTES check above;
-                    // skip rather than panic if the assumption is ever wrong.
-                    continue;
-                };
-                if let Some(target) = worker.lookup(*sub_conn_id) {
-                    target.enqueue(&scratch[..n]);
-                }
-            }
+            handle_pub(subject, reply_to, payload, state, worker);
         }
         Frame::Msg { .. } | Frame::Info { .. } | Frame::Ok | Frame::Err { .. } => {
             // Server-to-client direction; clients should not send these.
@@ -371,5 +381,79 @@ fn emit_err_to(state: &Rc<ConnectionState>, msg: &[u8]) {
     let mut buf = [0u8; SHORT_FRAME_BUF];
     if let Ok(n) = emit_err(&mut buf, msg) {
         state.enqueue(&buf[..n]);
+    }
+}
+
+fn subject_error_text(e: aulon_core::SubjectError) -> &'static [u8] {
+    match e {
+        aulon_core::SubjectError::Empty => b"empty subject",
+        aulon_core::SubjectError::EmptyToken => b"empty token in subject",
+        aulon_core::SubjectError::WildcardInPublish => b"wildcard not allowed in publish subject",
+        aulon_core::SubjectError::InvalidGreaterPosition => b"`>` must be the last token",
+    }
+}
+
+/// Splits matching subscribers into "always deliver" plain subs and
+/// per-queue-group buckets. Picks one member per queue group via the
+/// worker's RNG, encodes one `MSG` per delivery into the worker's
+/// scratch, and enqueues into the target connection's outbound buffer.
+///
+/// The plain list and the queue-group buckets are inline `SmallVec`s
+/// at fanouts up to `PUB_INLINE_PLAIN` / `PUB_INLINE_GROUPS`; larger
+/// fanouts spill to the heap. Linear scan over groups is faster than
+/// a `HashMap` while the number of distinct groups per publish is
+/// small, which it is in real workloads.
+fn handle_pub(
+    subject: &[u8],
+    reply_to: Option<&[u8]>,
+    payload: &[u8],
+    state: &Rc<ConnectionState>,
+    worker: &Rc<Worker>,
+) {
+    let mut plain: SmallVec<[Snapshot; PUB_INLINE_PLAIN]> = SmallVec::new();
+    let mut groups: SmallVec<[GroupBucket; PUB_INLINE_GROUPS]> = SmallVec::new();
+
+    {
+        let table = worker.table.borrow();
+        let res = table.for_each_match(subject, |sub| {
+            let entry = (sub.conn_id, sub.sid.clone());
+            match &sub.queue_group {
+                Some(qg) => {
+                    if let Some(bucket) = groups.iter_mut().find(|(k, _)| **k == **qg) {
+                        bucket.1.push(entry);
+                    } else {
+                        let mut bucket = SmallVec::new();
+                        bucket.push(entry);
+                        groups.push((qg.clone(), bucket));
+                    }
+                }
+                None => plain.push(entry),
+            }
+        });
+        if let Err(e) = res {
+            drop(table);
+            emit_err_to(state, subject_error_text(e));
+            return;
+        }
+    }
+
+    let mut scratch = worker.emit_scratch.borrow_mut();
+    for (conn_id, sid) in &plain {
+        let Ok(n) = emit_msg(&mut scratch, subject, sid, reply_to, payload) else {
+            continue;
+        };
+        if let Some(target) = worker.lookup(*conn_id) {
+            target.enqueue(&scratch[..n]);
+        }
+    }
+    for (_qg, members) in &groups {
+        let pick = worker.pick_index(members.len());
+        let (conn_id, sid) = &members[pick];
+        let Ok(n) = emit_msg(&mut scratch, subject, sid, reply_to, payload) else {
+            continue;
+        };
+        if let Some(target) = worker.lookup(*conn_id) {
+            target.enqueue(&scratch[..n]);
+        }
     }
 }
