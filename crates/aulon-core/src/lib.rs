@@ -5,6 +5,8 @@
 
 pub mod buffer_pool;
 pub mod connection;
+pub mod subscription;
 
 pub use buffer_pool::{BufferPool, DEFAULT_BUFFER_SIZE, DEFAULT_POOL_CAPACITY};
 pub use connection::{Active, Closing, Connection, ReadOutcome, State};
+pub use subscription::{ConnectionId, Sub, SubscriptionTable};

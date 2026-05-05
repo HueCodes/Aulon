@@ -19,6 +19,7 @@ rust-version = "1.85"
 tokio-uring = { version = "0.5" }
 hdrhistogram = { version = "7", default-features = false }
 criterion = { version = "0.5" }
+smallvec = { version = "1.13" }
 
 [workspace.lints.rust]
 unsafe_code = "deny"
