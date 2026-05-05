@@ -13,4 +13,4 @@ pub use connection::{Active, Closing, Connection, ReadOutcome, State};
 pub use connection_state::{
     CloseReason, ConnectionState, EnqueueOutcome, DEFAULT_OUTBOUND_CAPACITY,
 };
-pub use subscription::{ConnectionId, Sub, SubscriptionTable};
+pub use subscription::{ConnectionId, Sub, SubjectError, SubscriptionTrie};
