@@ -6,6 +6,7 @@ members = [
     "crates/aulon-server",
     "crates/aulon-bench",
 ]
+exclude = ["fuzz"]
 
 [workspace.package]
 version = "0.0.1"

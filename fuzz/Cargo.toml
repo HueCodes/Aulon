@@ -1,0 +1,25 @@
+[package]
+name = "aulon-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.aulon-proto]
+path = "../crates/aulon-proto"
+
+# Prevent this from being picked up by `cargo build --workspace`.
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "parse_frame"
+path = "fuzz_targets/parse_frame.rs"
+test = false
+doc = false
+bench = false
