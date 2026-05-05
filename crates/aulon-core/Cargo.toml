@@ -20,5 +20,9 @@ criterion = { workspace = true }
 name = "buffer_pool"
 harness = false
 
+[[bench]]
+name = "trie"
+harness = false
+
 [lints]
 workspace = true

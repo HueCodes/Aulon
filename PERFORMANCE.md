@@ -249,3 +249,61 @@ CARGO_TARGET_DIR=/tmp/aulon-target bash bench/fanout.sh
 - p99/max are jitter-bound (OrbStack VM, single-process scheduler
   contention).
 
+## C3 trie match — 2026-05-04
+
+Criterion micro-bench against a `SubscriptionTrie` populated with
+**10,000 subscriptions** distributed as a representative shape:
+7,000 exact subjects of the form `app.<i mod 10>.svc.<i>`, 2,500
+single-`*` wildcards `app.<i mod 25>.metric.*`, and 500 `>`
+subscriptions `tenant.<i mod 50>.>`.
+
+Reproducer:
+
+```
+CARGO_TARGET_DIR=/tmp/aulon-target cargo bench -p aulon-core --bench trie
+```
+
+| Publish subject | Tokens | Median |
+| ---: | ---: | ---: |
+| `app.0` | 2 | 64.95 ns |
+| `app.0.metric.cpu` | 3 | 94.05 ns |
+| `app.0.svc.42` | 4 | 109.87 ns |
+| `tenant.0.foo.bar.baz` | 5 | 66.69 ns |
+| `tenant.0.a.b.c.d.e` | 7 | 66.34 ns |
+
+The C3 design-doc target was median **< 500 ns at 3-token subjects**;
+the trie clears that by ~5×. The 5- and 7-token rows are faster than
+the 4-token row because they walk into a `>`-anchored branch whose
+sole match is emitted once and the recursion ends immediately, while
+`app.0.svc.<n>` walks four levels of `HashMap<Box<[u8]>, Box<Node>>`
+to reach a single exact subscriber. The cost is dominated by per-
+level work, not subject length.
+
+## C3 nats CLI wildcards + queue groups — 2026-05-04
+
+Reproducer (inside the VM):
+
+```
+/tmp/aulon-target/release/aulon-server &
+nats sub -s nats://127.0.0.1:4222 'foo.*' --count 1
+nats pub -s nats://127.0.0.1:4222 foo.bar 'hello wildcard'
+
+nats sub -s nats://127.0.0.1:4222 'foo.>' --count 1
+nats pub -s nats://127.0.0.1:4222 foo.bar.baz 'hello greater'
+
+# queue group: 3 workers, 6 publishes — each message goes to
+# exactly one worker.
+for i in 1 2 3; do
+    nats sub -s nats://127.0.0.1:4222 work --queue workers > /tmp/q$i.log &
+done
+for i in 1 2 3 4 5 6; do
+    nats pub -s nats://127.0.0.1:4222 work "task-$i"
+done
+```
+
+Result: `foo.*` and `foo.>` deliveries arrive correctly; queue-group
+distribution across three subscribers totals exactly 6 (no
+duplication, no losses). Distribution skew (1/1/4 in this run) is the
+expected variance of random pick over a 6-message window; with a
+larger sample the histogram flattens.
+
