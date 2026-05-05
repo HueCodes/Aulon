@@ -198,3 +198,54 @@ hello from nats CLI
 
 Reference-client compatibility on the gate's verb subset (`CONNECT`,
 `SUB`, `PUB`, `MSG`, `PING`, `PONG`) is now established.
+
+## C2 fanout reproducer — 2026-05-04
+
+`bench/fanout.sh`. Same VM as C1, single Aulon server instance, one
+publisher + N subscribers all hosted in a single `aulon-fanout`
+client process. Publish-to-deliver latency is measured by embedding a
+big-endian `u64` nanosecond timestamp (relative to a process-local
+`Instant` baseline) in the first 8 bytes of every payload; each
+subscriber decodes the timestamp on receipt and records `now − sent`
+into its own HDR histogram. Histograms are merged at the end.
+
+Reproducer:
+
+```
+CARGO_TARGET_DIR=/tmp/aulon-target bash bench/fanout.sh
+```
+
+### Results
+
+`AULON_WARMUP=500`, server pinned to CPU 0, client pinned to CPU 1.
+
+| Run | Fanout | Payload | Iterations | p50 | p90 | p99 | max |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| A | 2 | 128 B | 5,000 | 1.13 ms | 2.45 ms | 91.16 ms | 91.29 ms |
+| B | 8 | 256 B | 5,000 | 11.40 ms | 16.01 ms | 58.75 ms | 59.70 ms |
+
+### Notes
+
+- The headline of this run is **completeness**, not absolute latency:
+  the bench reliably delivers 100 % of `iterations × fanout` messages,
+  detects slow consumers via TCP shutdown, and merges per-subscriber
+  histograms into a single distribution. The numbers above are an
+  upper bound, not Aulon's true fanout latency.
+- The publisher and all `N` subscribers run on a single
+  `tokio_uring` runtime in one process. With `tokio::task::yield_now`
+  inserted between PUBs, subscribers do get scheduled, but the
+  publisher still dominates the runtime — what we are measuring at
+  p50 is closer to "how long it takes one tokio-uring task to drain
+  N TCP recv buffers between publisher yields" than per-message wire
+  latency. The C5 multi-process variant (publisher and subscribers in
+  separate `tokio_uring::start` runtimes, pinned to different cores)
+  is what produces the headline fanout number.
+- Outbound capacity per connection is 2 MiB
+  (`DEFAULT_OUTBOUND_CAPACITY`). At payload 256 B and 8 subscribers,
+  this comfortably absorbs `iterations ≤ ~7000` without slow-consumer
+  eviction; above that, the bench correctly detects eviction
+  (subscribers report `eof after N msgs`) rather than hanging — the
+  server shuts the socket on writer-task exit so the peer sees FIN.
+- p99/max are jitter-bound (OrbStack VM, single-process scheduler
+  contention).
+

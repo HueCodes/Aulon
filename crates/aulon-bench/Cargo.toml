@@ -12,7 +12,12 @@ rust-version.workspace = true
 name = "aulon-bench"
 path = "src/main.rs"
 
+[[bin]]
+name = "aulon-fanout"
+path = "src/fanout.rs"
+
 [dependencies]
+tokio = { workspace = true, features = ["sync", "rt"] }
 tokio-uring = { workspace = true }
 hdrhistogram = { workspace = true }
 
