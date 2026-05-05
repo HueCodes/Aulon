@@ -39,8 +39,7 @@ struct Config {
 
 impl Config {
     fn from_env() -> Result<Self, String> {
-        let addr_str =
-            std::env::var("AULON_ADDR").unwrap_or_else(|_| "127.0.0.1:4222".to_string());
+        let addr_str = std::env::var("AULON_ADDR").unwrap_or_else(|_| "127.0.0.1:4222".to_string());
         let addr: SocketAddr = addr_str
             .parse()
             .map_err(|e| format!("AULON_ADDR={addr_str:?}: {e}"))?;
@@ -129,11 +128,12 @@ fn main() {
                     return 1;
                 }
             };
-            let elapsed_ns = u64::try_from(t0.elapsed().as_nanos())
-                .expect("RTT fits in u64 ns (60 s ceiling)");
+            let elapsed_ns =
+                u64::try_from(t0.elapsed().as_nanos()).expect("RTT fits in u64 ns (60 s ceiling)");
             send = s;
             recv = r;
-            hist.record(elapsed_ns).expect("RTT within histogram bounds");
+            hist.record(elapsed_ns)
+                .expect("RTT within histogram bounds");
         }
 
         report(&hist, &config);

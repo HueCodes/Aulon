@@ -53,8 +53,7 @@ struct Config {
 
 impl Config {
     fn from_env() -> Result<Self, String> {
-        let addr_str =
-            std::env::var("AULON_ADDR").unwrap_or_else(|_| "127.0.0.1:4222".to_string());
+        let addr_str = std::env::var("AULON_ADDR").unwrap_or_else(|_| "127.0.0.1:4222".to_string());
         let addr: SocketAddr = addr_str
             .parse()
             .map_err(|e| format!("AULON_ADDR={addr_str:?}: {e}"))?;

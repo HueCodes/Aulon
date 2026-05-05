@@ -108,11 +108,7 @@ pub fn emit_sub(
 }
 
 /// Emits `UNSUB <sid> [max_msgs]\r\n`.
-pub fn emit_unsub(
-    out: &mut [u8],
-    sid: &[u8],
-    max_msgs: Option<u64>,
-) -> Result<usize, EmitError> {
+pub fn emit_unsub(out: &mut [u8], sid: &[u8], max_msgs: Option<u64>) -> Result<usize, EmitError> {
     let mut n = 0;
     n = write_all(out, n, b"UNSUB ")?;
     n = write_all(out, n, sid)?;

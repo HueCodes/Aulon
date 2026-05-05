@@ -86,7 +86,10 @@ impl Connection<Active> {
         // INVARIANT: in Active state, the connection always holds its buffer
         // between method calls. `read` and `write_all` take it to satisfy
         // the rent-return I/O API and put it back before returning.
-        let buf = self.buffer.take().expect("Active connection holds its buffer");
+        let buf = self
+            .buffer
+            .take()
+            .expect("Active connection holds its buffer");
         let (result, returned) = self.stream.read_fixed(buf).await;
         self.buffer = Some(returned);
         match result {
@@ -99,7 +102,10 @@ impl Connection<Active> {
     /// Writes the first `len` bytes of the connection's buffer to the stream
     /// using `IORING_OP_WRITE_FIXED`.
     pub async fn write_all(&mut self, len: usize) -> io::Result<()> {
-        let buf = self.buffer.take().expect("Active connection holds its buffer");
+        let buf = self
+            .buffer
+            .take()
+            .expect("Active connection holds its buffer");
         let (result, slice) = self.stream.write_fixed_all(buf.slice(..len)).await;
         self.buffer = Some(slice.into_inner());
         result

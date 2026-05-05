@@ -166,7 +166,9 @@ mod tests {
         assert!(t.unsubscribe(b"foo", ConnectionId::new(1), b"7"));
         let subs = t.subscribers(b"foo");
         assert_eq!(subs.len(), 2);
-        assert!(subs.iter().all(|s| !(s.conn_id == ConnectionId::new(1) && s.sid.as_ref() == b"7")));
+        assert!(subs
+            .iter()
+            .all(|s| !(s.conn_id == ConnectionId::new(1) && s.sid.as_ref() == b"7")));
     }
 
     #[test]
@@ -192,10 +194,7 @@ mod tests {
         t.subscribe(b"foo", sub(1, b"7"));
         t.subscribe(b"bar", sub(1, b"8"));
         t.subscribe(b"baz", sub(2, b"9"));
-        t.remove_connection(
-            ConnectionId::new(1),
-            [b"foo".as_ref(), b"bar".as_ref()],
-        );
+        t.remove_connection(ConnectionId::new(1), [b"foo".as_ref(), b"bar".as_ref()]);
         assert!(t.subscribers(b"foo").is_empty());
         assert!(t.subscribers(b"bar").is_empty());
         assert_eq!(t.subscribers(b"baz").len(), 1);

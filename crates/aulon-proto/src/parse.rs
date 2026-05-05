@@ -319,7 +319,11 @@ fn consume_payload(buf: &[u8], header_total: usize, payload_len: usize) -> Optio
     Some((&buf[header_total..payload_end], total))
 }
 
-fn need_more_or_missing_crlf(buf: &[u8], header_total: usize, payload_len: usize) -> ParseOutcome<'_> {
+fn need_more_or_missing_crlf(
+    buf: &[u8],
+    header_total: usize,
+    payload_len: usize,
+) -> ParseOutcome<'_> {
     let Some(payload_end) = header_total.checked_add(payload_len) else {
         return ParseOutcome::Err(ParseError::PayloadLengthInvalid);
     };
