@@ -14,7 +14,7 @@ path = "src/main.rs"
 
 [dependencies]
 aulon-core = { path = "../aulon-core" }
-monoio = { workspace = true }
+tokio-uring = { workspace = true }
 
 [lints]
 workspace = true

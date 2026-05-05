@@ -8,11 +8,9 @@ use std::fmt;
 use std::io;
 use std::marker::PhantomData;
 
-use monoio::buf::IoBuf;
-use monoio::io::{AsyncReadRent, AsyncWriteRentExt};
-use monoio::net::TcpStream;
-
-use crate::buffer_pool::PooledBuffer;
+use tokio_uring::buf::fixed::FixedBuf;
+use tokio_uring::buf::BoundedBuf;
+use tokio_uring::net::TcpStream;
 
 mod sealed {
     pub trait Sealed {}
@@ -38,14 +36,15 @@ pub enum Closing {}
 impl sealed::Sealed for Closing {}
 impl State for Closing {}
 
-/// A TCP connection in lifecycle state `S`.
+/// A TCP connection in lifecycle state `S`, paired with a registered fixed
+/// buffer for the duration of its `Active` lifetime.
 ///
-/// An `Active` connection carries a rented [`PooledBuffer`]; transitioning to
-/// `Closing` returns that buffer to the caller for release back into its
-/// pool.
+/// On transition to `Closing`, the buffer is handed back to the caller so
+/// it can be released (dropped) at a deterministic point rather than
+/// surviving the connection itself.
 pub struct Connection<S: State> {
     stream: TcpStream,
-    buffer: Option<PooledBuffer>,
+    buffer: Option<FixedBuf>,
     _state: PhantomData<S>,
 }
 
@@ -53,7 +52,7 @@ impl<S: State> fmt::Debug for Connection<S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Connection")
             .field("state", &std::any::type_name::<S>())
-            .field("buffer", &self.buffer)
+            .field("buffer_held", &self.buffer.is_some())
             .finish_non_exhaustive()
     }
 }
@@ -63,15 +62,15 @@ impl<S: State> fmt::Debug for Connection<S> {
 pub enum ReadOutcome {
     /// `n` bytes were read into the connection's buffer; `n > 0`.
     Bytes(usize),
-    /// The peer half-closed (read returned 0).
+    /// The peer half-closed (`read_fixed` returned 0).
     PeerClosed,
 }
 
 impl Connection<Active> {
-    /// Wraps an accepted stream with the buffer the connection will use for
-    /// the duration of its `Active` lifetime.
+    /// Wraps an accepted stream with the registered buffer the connection
+    /// will use for the duration of its `Active` lifetime.
     #[must_use]
-    pub fn new(stream: TcpStream, buffer: PooledBuffer) -> Self {
+    pub fn new(stream: TcpStream, buffer: FixedBuf) -> Self {
         Self {
             stream,
             buffer: Some(buffer),
@@ -79,15 +78,16 @@ impl Connection<Active> {
         }
     }
 
-    /// Reads from the underlying stream into the connection's buffer.
+    /// Reads from the underlying stream into the connection's registered
+    /// buffer using `IORING_OP_READ_FIXED`.
     ///
-    /// On `Ok`, the buffer's `init_len` reflects the bytes read.
+    /// On `Ok`, the buffer's `bytes_init` (length) reflects the bytes read.
     pub async fn read(&mut self) -> io::Result<ReadOutcome> {
         // INVARIANT: in Active state, the connection always holds its buffer
         // between method calls. `read` and `write_all` take it to satisfy
-        // monoio's owned-buffer API and put it back before returning.
+        // the rent-return I/O API and put it back before returning.
         let buf = self.buffer.take().expect("Active connection holds its buffer");
-        let (result, returned) = self.stream.read(buf).await;
+        let (result, returned) = self.stream.read_fixed(buf).await;
         self.buffer = Some(returned);
         match result {
             Ok(0) => Ok(ReadOutcome::PeerClosed),
@@ -96,18 +96,19 @@ impl Connection<Active> {
         }
     }
 
-    /// Writes the first `len` bytes of the connection's buffer to the stream.
+    /// Writes the first `len` bytes of the connection's buffer to the stream
+    /// using `IORING_OP_WRITE_FIXED`.
     pub async fn write_all(&mut self, len: usize) -> io::Result<()> {
         let buf = self.buffer.take().expect("Active connection holds its buffer");
-        let (result, slice) = self.stream.write_all(buf.slice(..len)).await;
+        let (result, slice) = self.stream.write_fixed_all(buf.slice(..len)).await;
         self.buffer = Some(slice.into_inner());
-        result.map(|_| ())
+        result
     }
 
     /// Transitions to [`Closing`], handing the rented buffer back to the
-    /// caller so it can be released to the owning pool.
+    /// caller so it can be released to the owning pool by dropping it.
     #[must_use]
-    pub fn shutdown(self) -> (Connection<Closing>, PooledBuffer) {
+    pub fn shutdown(self) -> (Connection<Closing>, FixedBuf) {
         let buffer = self.buffer.expect("Active connection holds its buffer");
         let next = Connection {
             stream: self.stream,

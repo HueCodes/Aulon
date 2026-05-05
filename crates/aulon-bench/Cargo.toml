@@ -13,7 +13,7 @@ name = "aulon-bench"
 path = "src/main.rs"
 
 [dependencies]
-monoio = { workspace = true }
+tokio-uring = { workspace = true }
 hdrhistogram = { workspace = true }
 
 [lints]

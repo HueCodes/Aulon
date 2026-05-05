@@ -1,13 +1,10 @@
 //! Core runtime, buffer pool, routing, and topology for Aulon.
 //!
 //! Per-core fixed-buffer pool registered against `io_uring`; subscription
-//! state sharded by L3 cache domain. The only crate permitted to use
-//! `unsafe`, and only inside the `driver` module (introduced in C1).
+//! state sharded by L3 cache domain.
 
 pub mod buffer_pool;
 pub mod connection;
 
-pub use buffer_pool::{
-    BufferId, BufferPool, PooledBuffer, DEFAULT_BUFFER_SIZE, DEFAULT_POOL_CAPACITY,
-};
+pub use buffer_pool::{BufferPool, DEFAULT_BUFFER_SIZE, DEFAULT_POOL_CAPACITY};
 pub use connection::{Active, Closing, Connection, ReadOutcome, State};

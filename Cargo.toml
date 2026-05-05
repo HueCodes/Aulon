@@ -16,7 +16,7 @@ authors = ["Hugh Ryan <hugh.t.ryan@gmail.com>"]
 rust-version = "1.85"
 
 [workspace.dependencies]
-monoio = { version = "0.2" }
+tokio-uring = { version = "0.5" }
 hdrhistogram = { version = "7", default-features = false }
 
 [workspace.lints.rust]

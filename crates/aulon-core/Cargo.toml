@@ -9,7 +9,7 @@ authors.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-monoio = { workspace = true }
+tokio-uring = { workspace = true }
 
 [lints]
 workspace = true

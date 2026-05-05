@@ -20,12 +20,14 @@
 
 #![forbid(unsafe_code)]
 
+use std::iter;
 use std::net::SocketAddr;
 use std::time::Instant;
 
 use hdrhistogram::Histogram;
-use monoio::io::{AsyncReadRent, AsyncWriteRentExt};
-use monoio::net::TcpStream;
+use tokio_uring::buf::fixed::{FixedBuf, FixedBufPool};
+use tokio_uring::buf::BoundedBuf;
+use tokio_uring::net::TcpStream;
 
 #[derive(Debug)]
 struct Config {
@@ -62,8 +64,7 @@ fn parse_env_u64(key: &str, default: u64) -> Result<u64, String> {
     }
 }
 
-#[monoio::main(driver = "iouring")]
-async fn main() {
+fn main() {
     let config = match Config::from_env() {
         Ok(c) => c,
         Err(e) => {
@@ -72,63 +73,93 @@ async fn main() {
         }
     };
     eprintln!(
-        "aulon-bench: connecting to {} (payload {} B, warmup {}, iterations {})",
+        "aulon-bench: connecting to {} (payload {} B, warmup {}, iterations {}, IORING_OP_*_FIXED)",
         config.addr, config.payload_bytes, config.warmup, config.iterations
     );
 
-    let stream = match TcpStream::connect(config.addr).await {
-        Ok(s) => s,
-        Err(e) => {
-            eprintln!("aulon-bench: connect failed: {e}");
-            std::process::exit(1);
+    let exit = tokio_uring::start(async move {
+        // Pool of two registered buffers, both pre-filled with payload-size
+        // ASCII bytes so they each have `bytes_init = payload_bytes` on
+        // acquisition. The send path slices to ..payload_bytes; the read
+        // path overwrites bytes 0..n in-place. No `unsafe` needed.
+        let pool = FixedBufPool::<Vec<u8>>::new(
+            iter::repeat_with(|| vec![b'a'; config.payload_bytes]).take(2),
+        );
+        if let Err(e) = pool.register() {
+            eprintln!("aulon-bench: register_buffers failed: {e}");
+            return 1;
         }
-    };
 
-    if let Err(e) = run(stream, &config).await {
-        eprintln!("aulon-bench: run failed: {e}");
-        std::process::exit(1);
+        let stream = match TcpStream::connect(config.addr).await {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("aulon-bench: connect failed: {e}");
+                return 1;
+            }
+        };
+
+        let mut send = pool
+            .try_next(config.payload_bytes)
+            .expect("pool has two buffers; first acquire succeeds");
+        let mut recv = pool
+            .try_next(config.payload_bytes)
+            .expect("pool has two buffers; second acquire succeeds");
+
+        for _ in 0..config.warmup {
+            let (s, r) = match ping_pong(&stream, send, recv, config.payload_bytes).await {
+                Ok(p) => p,
+                Err(e) => {
+                    eprintln!("aulon-bench: warmup failed: {e}");
+                    return 1;
+                }
+            };
+            send = s;
+            recv = r;
+        }
+
+        let mut hist = Histogram::<u64>::new_with_bounds(1, 60_000_000_000, 3)
+            .expect("histogram bounds: 1 ns to 60 s with 3 sig figs is valid");
+
+        for _ in 0..config.iterations {
+            let t0 = Instant::now();
+            let (s, r) = match ping_pong(&stream, send, recv, config.payload_bytes).await {
+                Ok(p) => p,
+                Err(e) => {
+                    eprintln!("aulon-bench: measure failed: {e}");
+                    return 1;
+                }
+            };
+            let elapsed_ns = u64::try_from(t0.elapsed().as_nanos())
+                .expect("RTT fits in u64 ns (60 s ceiling)");
+            send = s;
+            recv = r;
+            hist.record(elapsed_ns).expect("RTT within histogram bounds");
+        }
+
+        report(&hist, &config);
+        drop(send);
+        drop(recv);
+        0
+    });
+    if exit != 0 {
+        std::process::exit(exit);
     }
-}
-
-async fn run(mut stream: TcpStream, config: &Config) -> std::io::Result<()> {
-    let mut send = vec![b'a'; config.payload_bytes];
-    let mut recv = vec![0u8; config.payload_bytes];
-
-    for _ in 0..config.warmup {
-        let (s, r) = ping_pong(&mut stream, send, recv, config.payload_bytes).await?;
-        send = s;
-        recv = r;
-    }
-
-    let mut hist = Histogram::<u64>::new_with_bounds(1, 60_000_000_000, 3)
-        .expect("histogram bounds: 1 ns to 60 s with 3 sig figs is valid");
-
-    for _ in 0..config.iterations {
-        let t0 = Instant::now();
-        let (s, r) = ping_pong(&mut stream, send, recv, config.payload_bytes).await?;
-        let elapsed_ns = u64::try_from(t0.elapsed().as_nanos())
-            .expect("RTT fits in u64 ns (60 s ceiling)");
-        send = s;
-        recv = r;
-        hist.record(elapsed_ns).expect("RTT within histogram bounds");
-    }
-
-    report(&hist, config);
-    Ok(())
 }
 
 async fn ping_pong(
-    stream: &mut TcpStream,
-    send: Vec<u8>,
-    recv: Vec<u8>,
+    stream: &TcpStream,
+    send: FixedBuf,
+    recv: FixedBuf,
     expected: usize,
-) -> std::io::Result<(Vec<u8>, Vec<u8>)> {
-    let (write_res, send) = stream.write_all(send).await;
+) -> std::io::Result<(FixedBuf, FixedBuf)> {
+    let (write_res, send_slice) = stream.write_fixed_all(send.slice(..expected)).await;
     write_res?;
+    let send = send_slice.into_inner();
+
     let mut total = 0;
     let mut buf = recv;
     while total < expected {
-        let (read_res, returned) = stream.read(buf).await;
+        let (read_res, returned) = stream.read_fixed(buf).await;
         buf = returned;
         let n = read_res?;
         if n == 0 {
