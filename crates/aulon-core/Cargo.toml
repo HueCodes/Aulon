@@ -10,6 +10,7 @@ rust-version.workspace = true
 
 [dependencies]
 tokio-uring = { workspace = true }
+tokio = { workspace = true }
 smallvec = { workspace = true }
 
 [dev-dependencies]
