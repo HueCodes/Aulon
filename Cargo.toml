@@ -18,6 +18,7 @@ rust-version = "1.85"
 [workspace.dependencies]
 tokio-uring = { version = "0.5" }
 hdrhistogram = { version = "7", default-features = false }
+criterion = { version = "0.5" }
 
 [workspace.lints.rust]
 unsafe_code = "deny"

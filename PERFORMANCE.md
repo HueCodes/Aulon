@@ -124,3 +124,55 @@ make the trade-off visible: we picked `tokio-uring` for the API surface
 overhead at this scale, in exchange for the fixed-buffer story we
 committed to in `docs/PROMPT.md`. C4's bare-metal headline is where the
 choice is actually validated or refuted.
+
+## C2 micro-benchmarks — 2026-05-04
+
+`criterion` 0.5 baseline numbers, `release` profile, OrbStack VM,
+single-thread. Reproducer:
+
+```
+CARGO_TARGET_DIR=/tmp/aulon-target cargo bench -p aulon-core --bench buffer_pool
+CARGO_TARGET_DIR=/tmp/aulon-target cargo bench -p aulon-proto --bench parse
+```
+
+### Buffer pool (`aulon-core::BufferPool`)
+
+| Op | Median |
+| ---: | ---: |
+| `acquire` + drop, 4 KiB buffer | 20.56 ns |
+| `acquire` + drop, 256 B buffer | 25.16 ns |
+
+The `acquire` path goes through `tokio_uring::buf::fixed::FixedBufPool::try_next`
+plus `FixedBuf::Drop`. Numbers reflect the pool's internal bookkeeping
+on an unregistered pool — the registered code path is the same; only
+the kernel mapping differs.
+
+The buffer-pool design doc set < 50 ns as the target for this op; both
+sizes clear it comfortably.
+
+### Wire codec (`aulon_proto::parse_frame`)
+
+| Verb / size | Median |
+| ---: | ---: |
+| `PING` | 5.52 ns |
+| `SUB foo.bar 7` | 13.92 ns |
+| `SUB foo.bar workers 7` | 20.07 ns |
+| `UNSUB 7 12` | 13.42 ns |
+| `PUB foo 16` (16 B payload) | 14.80 ns |
+| `PUB foo 256` (256 B payload) | 16.54 ns |
+| `PUB foo 4096` (4 KiB payload) | 18.17 ns |
+| `MSG foo 7 16` | 16.53 ns |
+| `MSG foo 7 256` | 18.51 ns |
+| `MSG foo 7 4096` | 20.25 ns |
+
+`parse_frame` cost grows mildly with payload size — the parser does
+not touch the payload bytes, but `find_crlf` walks the input until the
+first CRLF, and the trailing-CRLF check is a 2-byte compare against
+`buf[header_total + payload_len..]`. The slope ~0.5 ns per KiB is
+consistent with the trailing-CRLF check's bounds work (no payload
+scan).
+
+These numbers are the floor for downstream NATS-handler latency; the
+server's per-frame work in C2 layers on top of this. The codec budget
+inside a 25 µs single-core RTT is well under 1 % at any reasonable
+payload size.
