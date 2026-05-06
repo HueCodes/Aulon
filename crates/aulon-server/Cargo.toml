@@ -17,6 +17,10 @@ aulon-core = { path = "../aulon-core" }
 aulon-proto = { path = "../aulon-proto" }
 smallvec = { workspace = true }
 tokio-uring = { workspace = true }
+# C4 multi-shard bootstrap: SO_REUSEPORT listener per shard, thread-per-
+# L3 pinning. Both crates are tiny and well-maintained.
+socket2 = { version = "0.5", features = ["all"] }
+core_affinity = "0.8"
 
 [lints]
 workspace = true
