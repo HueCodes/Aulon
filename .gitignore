@@ -4,3 +4,4 @@
 perf.data*
 flamegraph.svg
 .DS_Store
+/.scratch/
