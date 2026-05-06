@@ -18,7 +18,7 @@ rust-version = "1.85"
 
 [workspace.dependencies]
 tokio-uring = { version = "0.5" }
-tokio = { version = "1", default-features = false, features = ["sync"] }
+tokio = { version = "1", default-features = false, features = ["sync", "rt"] }
 hdrhistogram = { version = "7", default-features = false }
 criterion = { version = "0.5" }
 smallvec = { version = "1.13" }
@@ -30,6 +30,9 @@ missing_docs = "warn"
 unreachable_pub = "warn"
 unused_must_use = "deny"
 missing_debug_implementations = "warn"
+# Loom is enabled via `RUSTFLAGS="--cfg loom"` for shard-inbox
+# concurrency tests; register it so check-cfg stays clean.
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(loom)'] }
 
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -1 }
