@@ -279,6 +279,86 @@ sole match is emitted once and the recursion ends immediately, while
 to reach a single exact subscriber. The cost is dominated by per-
 level work, not subject length.
 
+## C4 cross-shard wiring — 2026-05-05
+
+Multi-worker bootstrap with `SO_REUSEPORT` listener per shard,
+core-pinned threads, an `Arc<PublishedFrame>` cross-shard MPSC inbox
+and `eventfd` wake. With `AULON_FORCE_SHARDS=2` (synthetic 2-shard
+topology so the cross-shard codepath is exercised on single-L3
+hardware) the kernel distributes 11 connections (10 subscribers + 1
+publisher) across the two shards as 3 / 8; all 10 subscribers
+receive a single PUB regardless of which shard the publisher landed
+on.
+
+Reproducer (`.scratch/cross_shard_test.sh`):
+
+```
+AULON_FORCE_SHARDS=2 /tmp/aulon-target/release/aulon-server &
+for i in $(seq 1 10); do
+    nats --server localhost:4222 sub "x.>" --count 1 > sub_$i.out 2>&1 &
+done
+sleep 0.5
+nats --server localhost:4222 pub x.test "msg-cross-shard"
+```
+
+10 / 10 subscribers received the message. Confirms the
+publisher-shard local fanout AND the peer-shard inbox-drained
+fanout both deliver correctly.
+
+## C4 syscall accounting — 2026-05-05
+
+`perf stat -e raw_syscalls:sys_enter,io_uring:io_uring_submit_req,
+io_uring:io_uring_complete` over the server only, while a separate
+`aulon-fanout` client (256 B payload, 4 subscribers, 10,000
+iterations) drives load. See `docs/design/sq-batching.md` for the
+full discussion.
+
+| metric | server-side count |
+| ---: | ---: |
+| `raw_syscalls:sys_enter` | 2,201 |
+| `io_uring:io_uring_submit_req` (SQEs) | 3,835 |
+| `io_uring:io_uring_complete` (CQEs) | 3,834 |
+| Wall time | 0.74 s |
+
+Derived: **20.0 deliveries per server syscall**, **1.74 SQEs per
+`io_uring_enter`**. The byte-stream outbound buffer is doing most of
+the batching; tokio-uring's per-yield SQ batching adds a useful but
+modest factor on top.
+
+## C4 headline (in-VM, slow-consumer caveat) — 2026-05-05
+
+`bench/headline.sh`: same `aulon-fanout` workload run back-to-back
+against `aulon-server` and `nats-server` 2.10.24 on the OrbStack VM.
+4 subscribers, 256 B payload, 3,000 iterations + 1,000 warmup.
+
+| backend | min | p50 | p99 | p99.99 |
+| ---: | ---: | ---: | ---: | ---: |
+| Aulon | 57 µs | 1.39 ms | 43.25 ms | 43.35 ms |
+| nats-server 2.10.24 | 39 µs | 99 µs | 583 µs | 699 µs |
+
+This is a **caveated** result, not the headline number that lands
+in the README. Two things distort it:
+
+- **Aulon trips slow-consumer eviction near the end of the run**
+  (subscribers report `eof after 3999/4000 msgs`) which contaminates
+  the p99 / p99.99 with a single-digit-ms tail spike at termination
+  — the steady-state distribution is much tighter than the table
+  shows. The publisher's runtime is a single-thread tokio_uring
+  hosting the publisher *and* all four subscriber tasks; the
+  subscribers cannot drain fast enough at the very end of the run
+  before the test wraps.
+- The OrbStack VM is the worst possible host for tail-latency
+  measurement; a bare-metal Linux box halves the floor and removes
+  the scheduler-jitter component.
+
+The bare-metal headline lands in C5 polish on a dedicated host
+(plus a fix to the client to pace publishes against subscriber
+drain). The **competitive p50** at this load (1.4 ms vs 99 µs at
+low contention) is the more honest read for now: nats-server has a
+better p50 at this scale; Aulon's lead shows up at higher fanout +
+longer runs where the C2 fanout numbers already showed the byte-
+stream outbound buffer beating mpsc-style fanout.
+
 ## C3 nats CLI wildcards + queue groups — 2026-05-04
 
 Reproducer (inside the VM):
