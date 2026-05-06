@@ -9,9 +9,22 @@ authors.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+smallvec = { workspace = true }
+
+# tokio-uring + tokio have internal `cfg(loom)` gates that interfere
+# with our `--cfg loom` build, so we drop them entirely under loom.
+# The cfg-gated modules in src/lib.rs are excluded under loom too.
+# `libc` is needed for the eventfd cross-shard wake primitive.
+[target.'cfg(not(loom))'.dependencies]
 tokio-uring = { workspace = true }
 tokio = { workspace = true }
-smallvec = { workspace = true }
+libc = "0.2"
+
+# Loom needs to be a regular dependency (not dev-dep) so the lib's
+# `#[cfg(loom)] use loom::...` lines resolve. It is gated to `cfg(loom)`
+# so it is absent from the normal build.
+[target.'cfg(loom)'.dependencies]
+loom = "0.7"
 
 [dev-dependencies]
 criterion = { workspace = true }
