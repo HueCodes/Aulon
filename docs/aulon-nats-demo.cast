@@ -1,0 +1,7 @@
+{"version": 2, "width": 80, "height": 24, "timestamp": 1778819454, "env": {"SHELL": "/bin/bash", "TERM": "xterm-ghostty"}}
+[0.001948, "o", "Aulon NATS-core demo\r\n\r\n$ /tmp/aulon-target/release/aulon-server &\r\n"]
+[0.505585, "o", "\r\n$ nats sub foo --count 1 &\r\n"]
+[0.537881, "o", "21:30:54 Subscribing on foo \r\n"]
+[1.112766, "o", "\r\n$ nats pub foo \"hello from the nats CLI to Aulon\"\r\n"]
+[1.131693, "o", "21:30:55 Published 32 bytes to \"foo\"\r\n[#1] Received on \"foo\"\r\nhello from the nats CLI to Aulon\r\n\r\n\r\n"]
+[1.937686, "o", "\r\n"]

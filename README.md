@@ -17,7 +17,7 @@ The workspace: `aulon-proto` (`#![no_std]`-clean, allocation-free wire codec, fu
 
 ## Status
 
-Pre-v0.1. Checkpoints C0–C4 complete; C5 (polish) in progress. The bare-metal headline chart lands when C5 closes; in-VM numbers and their caveats live in [`PERFORMANCE.md`](PERFORMANCE.md). Reviews per checkpoint are under [`docs/reviews/`](docs/reviews/); one written-up debugging story so far is [`docs/war-stories/loom-tokio-cfg.md`](docs/war-stories/loom-tokio-cfg.md).
+Pre-v0.1. Checkpoints C0–C4 complete; C5 (polish) in progress. The bare-metal headline chart lands when C5 closes; in-VM numbers and their caveats live in [`PERFORMANCE.md`](PERFORMANCE.md). Reviews per checkpoint are under [`docs/reviews/`](docs/reviews/); one written-up debugging story so far is [`docs/war-stories/loom-tokio-cfg.md`](docs/war-stories/loom-tokio-cfg.md). A two-second asciinema cast showing the official `nats` CLI publish-and-subscribe round-trip is at [`docs/aulon-nats-demo.cast`](docs/aulon-nats-demo.cast) (open with `asciinema play`).
 
 ## Build
 
