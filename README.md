@@ -2,7 +2,7 @@
 
 Aulon is a NATS-core-compatible message broker built thread-per-core on `tokio-uring`, with `io_uring` fixed buffers registered against the kernel via `IORING_REGISTER_BUFFERS` and a subscription router sharded by L3 cache domain. The publish hot path is allocation-free by construction: `PUB` parsing, trie matching, and `MSG` emission all operate over borrowed bytes into pre-registered buffers.
 
-Single-message-in-flight publish-to-deliver latency, 4 subscribers, 256 B payload, OrbStack Ubuntu VM on an Apple M2 (the in-VM number; bare-metal lands below):
+Single-message-in-flight publish-to-deliver latency, 4 subscribers, 256 B payload, OrbStack Ubuntu VM on an Apple M2 (bare-metal pending; see the [C5 review](docs/reviews/checkpoint-5.md)):
 
 | backend | p50 | p99 | p99.9 |
 | --- | ---: | ---: | ---: |
@@ -17,7 +17,7 @@ The workspace: `aulon-proto` (`#![no_std]`-clean, allocation-free wire codec, fu
 
 ## Status
 
-Pre-v0.1. Checkpoints C0–C4 complete; C5 (polish) in progress. The bare-metal headline chart lands when C5 closes; in-VM numbers and their caveats live in [`PERFORMANCE.md`](PERFORMANCE.md). Reviews per checkpoint are under [`docs/reviews/`](docs/reviews/); one written-up debugging story so far is [`docs/war-stories/loom-tokio-cfg.md`](docs/war-stories/loom-tokio-cfg.md). A two-second asciinema cast showing the official `nats` CLI publish-and-subscribe round-trip is at [`docs/aulon-nats-demo.cast`](docs/aulon-nats-demo.cast) (open with `asciinema play`).
+Pre-v0.1. Checkpoints C0–C5 closed against the in-VM headline; the bare-metal single-row chart is the remaining carry-forward. Per-checkpoint reviews are under [`docs/reviews/`](docs/reviews/), the measurement log is [`PERFORMANCE.md`](PERFORMANCE.md), and one written-up debugging story is [`docs/war-stories/loom-tokio-cfg.md`](docs/war-stories/loom-tokio-cfg.md). A two-second asciinema cast of the official `nats` CLI publish-and-subscribe round-trip against Aulon is at [`docs/aulon-nats-demo.cast`](docs/aulon-nats-demo.cast) (open with `asciinema play`).
 
 ## Build
 
