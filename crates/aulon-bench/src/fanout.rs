@@ -15,10 +15,13 @@
 //! they run in the same process; this is what lets us measure one-way
 //! delivery latency without coordinating two clocks.
 //!
-//! Coordinated-omission correction is **not** applied here either — the
-//! publisher waits for its own write to complete before issuing the next
-//! one, so the load is sequential, not paced. A paced multi-publisher
-//! variant lands in C5.
+//! Coordinated-omission correction is **not** applied here. The publisher
+//! waits for its own `write_all` to complete before issuing the next PUB,
+//! and `AULON_PACE_WINDOW` bounds how far ahead of the slowest subscriber
+//! the publisher is allowed to run. The window is a hard back-pressure
+//! signal against the per-connection outbound ring rather than a
+//! paced-load model; a paced multi-publisher variant is still future
+//! work.
 //!
 //! Configuration is environment-driven, mirroring `aulon-bench`:
 //!
@@ -27,10 +30,18 @@
 //! - `AULON_PAYLOAD_BYTES` (default `256`) — must be `>= 8` to fit timestamp
 //! - `AULON_ITERATIONS` (default `50000`)
 //! - `AULON_WARMUP` (default `1000`)
+//! - `AULON_PACE_WINDOW` (default `2`, `0` disables): maximum number of
+//!   messages the publisher is allowed to be ahead of the slowest
+//!   subscriber. Acts as back-pressure against the per-connection
+//!   outbound buffer; without it, single-process runs trip slow-consumer
+//!   eviction near the end of the run and contaminate the tail
+//!   percentiles. Tighter values (1-2) expose steady-state per-message
+//!   latency; larger values (16+) reflect the depth of the in-flight
+//!   queue. See `docs/reviews/checkpoint-4.md`.
 
 #![forbid(unsafe_code)]
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::net::SocketAddr;
 use std::rc::Rc;
 use std::time::Instant;
@@ -49,6 +60,7 @@ struct Config {
     payload_bytes: usize,
     iterations: u64,
     warmup: u64,
+    pace_window: u64,
 }
 
 impl Config {
@@ -69,12 +81,14 @@ impl Config {
         }
         let iterations = parse_env_u64("AULON_ITERATIONS", 50_000)?;
         let warmup = parse_env_u64("AULON_WARMUP", 1_000)?;
+        let pace_window = parse_env_u64("AULON_PACE_WINDOW", 2)?;
         Ok(Self {
             addr,
             fanout,
             payload_bytes,
             iterations,
             warmup,
+            pace_window,
         })
     }
 }
@@ -95,8 +109,8 @@ fn main() {
         }
     };
     eprintln!(
-        "aulon-fanout: {} subscribers + 1 publisher on {} (payload {} B, warmup {}, iterations {})",
-        config.fanout, config.addr, config.payload_bytes, config.warmup, config.iterations
+        "aulon-fanout: {} subscribers + 1 publisher on {} (payload {} B, warmup {}, iterations {}, pace_window {})",
+        config.fanout, config.addr, config.payload_bytes, config.warmup, config.iterations, config.pace_window
     );
 
     let exit = tokio_uring::start(async move {
@@ -104,9 +118,14 @@ fn main() {
         let total_msgs = config.iterations + config.warmup;
 
         // Each subscriber owns a histogram in a Rc<RefCell<...>> so the
-        // main task can drain it once the subscriber exits.
+        // main task can drain it once the subscriber exits. The
+        // received-counter is the publisher's pacing signal: each
+        // subscriber bumps it after every successful MSG decode, and the
+        // publisher reads min(received) before each PUB to enforce the
+        // pace window.
         let mut sub_histograms: Vec<Rc<RefCell<Histogram<u64>>>> =
             Vec::with_capacity(config.fanout);
+        let mut sub_received: Vec<Rc<Cell<u64>>> = Vec::with_capacity(config.fanout);
         let mut sub_handles = Vec::with_capacity(config.fanout);
 
         for sub_idx in 0..config.fanout {
@@ -115,6 +134,8 @@ fn main() {
                     .expect("histogram bounds: 1 ns to 60 s, 3 sig figs"),
             ));
             sub_histograms.push(Rc::clone(&hist));
+            let received = Rc::new(Cell::new(0u64));
+            sub_received.push(Rc::clone(&received));
             let stream = match TcpStream::connect(config.addr).await {
                 Ok(s) => s,
                 Err(e) => {
@@ -125,6 +146,7 @@ fn main() {
             let handle = tokio_uring::spawn(subscriber_task(
                 stream,
                 hist,
+                received,
                 baseline,
                 total_msgs,
                 config.payload_bytes,
@@ -141,7 +163,7 @@ fn main() {
             }
         };
 
-        if let Err(e) = publisher_drive(&pub_stream, baseline, &config).await {
+        if let Err(e) = publisher_drive(&pub_stream, baseline, &config, &sub_received).await {
             eprintln!("aulon-fanout: publisher failed: {e}");
             return 1;
         }
@@ -173,6 +195,7 @@ fn main() {
 async fn subscriber_task(
     stream: TcpStream,
     hist: Rc<RefCell<Histogram<u64>>>,
+    received_counter: Rc<Cell<u64>>,
     baseline: Instant,
     expected_msgs: u64,
     payload_bytes: usize,
@@ -201,6 +224,7 @@ async fn subscriber_task(
                     .expect("delivery latency within histogram bounds");
             }
             received += 1;
+            received_counter.set(received);
             continue;
         }
 
@@ -222,6 +246,7 @@ async fn publisher_drive(
     stream: &TcpStream,
     baseline: Instant,
     config: &Config,
+    sub_received: &[Rc<Cell<u64>>],
 ) -> std::io::Result<()> {
     let mut accum: Vec<u8> = Vec::with_capacity(READ_CHUNK);
 
@@ -232,7 +257,18 @@ async fn publisher_drive(
 
     let total = config.warmup + config.iterations;
     let mut frame = Vec::with_capacity(64 + config.payload_bytes);
-    for _ in 0..total {
+    for sent in 0..total {
+        // Back-pressure: don't get more than `pace_window` messages
+        // ahead of the slowest subscriber. Without this, the publisher
+        // races ahead, fills the per-connection outbound ring, and
+        // trips slow-consumer eviction at the tail of the run. With
+        // pace_window=0 the pacing is disabled (legacy behaviour).
+        if config.pace_window > 0 {
+            while sent.saturating_sub(min_received(sub_received)) >= config.pace_window {
+                tokio::task::yield_now().await;
+            }
+        }
+
         frame.clear();
         let header = format!("PUB {} {}\r\n", str_subject(), config.payload_bytes);
         frame.extend_from_slice(header.as_bytes());
@@ -254,6 +290,14 @@ async fn publisher_drive(
         tokio::task::yield_now().await;
     }
     Ok(())
+}
+
+fn min_received(sub_received: &[Rc<Cell<u64>>]) -> u64 {
+    sub_received
+        .iter()
+        .map(|c| c.get())
+        .min()
+        .unwrap_or(u64::MAX)
 }
 
 fn build_connect_sub() -> Vec<u8> {

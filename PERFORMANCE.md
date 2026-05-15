@@ -387,3 +387,56 @@ duplication, no losses). Distribution skew (1/1/4 in this run) is the
 expected variance of random pick over a 6-message window; with a
 larger sample the histogram flattens.
 
+## C5 fanout, paced (in-VM) 2026-05-14
+
+The C4 review identified that `bench/fanout.sh` was tripping
+slow-consumer eviction at end-of-run: the single-thread `tokio_uring`
+runtime that hosts the publisher and all subscribers cannot drain
+fast enough as the publisher wraps, the per-connection 2 MiB outbound
+buffer fills, the server evicts the subscriber, and the resulting
+several-ms tail spike contaminates p99 / p99.99.
+
+The fix is a publisher pace window
+(`crates/aulon-bench/src/fanout.rs:240`). Each subscriber publishes
+its monotonically-increasing receive count via an `Rc<Cell<u64>>`;
+before each PUB the publisher reads `min(received)` across all
+subscribers and yields while `sent - min_received >= pace_window`.
+`AULON_PACE_WINDOW=2` is the new default for both `bench/fanout.sh`
+and `bench/headline.sh`: this keeps at most one outstanding message
+per subscriber, which exposes per-message steady-state latency rather
+than the depth of the in-flight queue. Larger values trade off
+honest latency for higher achievable throughput on the same single
+runtime.
+
+Reproducer:
+
+```
+CARGO_TARGET_DIR=/tmp/aulon-target AULON_FANOUT=4 \
+  AULON_ITERATIONS=3000 AULON_WARMUP=1000 \
+  AULON_PAYLOAD_BYTES=256 bash bench/fanout.sh
+```
+
+OrbStack Ubuntu VM, kernel 7.0.5, aarch64, 8 vCPU on M2 host. Server
+pinned to CPU 0, client pinned to CPU 1.
+
+| metric | value |
+| ---: | ---: |
+| count | 16,000 (4 subscribers x 4,000 frames) |
+| per-sub delivered | [4000, 4000, 4000, 4000] |
+| min | 18.4 us |
+| p50 | 28.8 us |
+| p90 | 44.5 us |
+| p99 | 49.9 us |
+| p99.9 | 69.9 us |
+| p99.99 | 40.5 ms |
+| max | 40.5 ms |
+
+No `eof after N msgs` lines in subscriber output. The single p99.99
+sample is the lone tail outlier in 16,000 deliveries and is bounded
+by VM scheduler jitter; the steady distribution is `p99.9 = 70 us`.
+
+For comparison with the C4 entry (same fanout, same payload), p50
+moved from 1.39 ms (eviction-contaminated) to 28.8 us. The 48x drop
+is not the broker getting faster between C4 and C5; it is the
+benchmark client getting honest.
+

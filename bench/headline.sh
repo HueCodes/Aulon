@@ -18,6 +18,16 @@
 #   AULON_PAYLOAD_BYTES   (default 256, must be >= 8)
 #   AULON_ADDR            (default 127.0.0.1:4222)
 #   AULON_FORCE_SHARDS    (passthrough; default unset = topology detect)
+#   AULON_PACE_WINDOW     (default 2) publisher back-pressure window.
+#                          With 2, the publisher waits for the slowest
+#                          subscriber to be at most one message behind,
+#                          which prevents the C4 end-of-run eviction
+#                          tail and exposes the broker's steady-state
+#                          per-message latency rather than the pipeline-
+#                          queue depth. See
+#                          crates/aulon-bench/src/fanout.rs for the
+#                          mechanism and docs/reviews/checkpoint-4.md
+#                          for the eviction context.
 #   CARGO_TARGET_DIR      (default ./target)
 #   NATS_SERVER_BIN       (default `nats-server` on PATH)
 #
@@ -52,6 +62,7 @@ export AULON_ITERATIONS="${AULON_ITERATIONS:-50000}"
 export AULON_WARMUP="${AULON_WARMUP:-1000}"
 export AULON_PAYLOAD_BYTES="${AULON_PAYLOAD_BYTES:-256}"
 export AULON_ADDR="${AULON_ADDR:-127.0.0.1:4222}"
+export AULON_PACE_WINDOW="${AULON_PACE_WINDOW:-2}"
 
 echo "==> Building release binaries"
 cargo build --release -p aulon-server -p aulon-bench --bin aulon-fanout --bin aulon-server >/dev/null
