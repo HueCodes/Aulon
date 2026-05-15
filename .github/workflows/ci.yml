@@ -49,3 +49,17 @@ jobs:
         with:
           command: check
           arguments: --all-features
+
+  public-api:
+    name: aulon-core public-api snapshot
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+      - name: Install cargo-public-api
+        run: cargo install --locked cargo-public-api
+      - name: Regenerate snapshot
+        run: bash scripts/snapshot-public-api.sh
+      - name: Fail on drift
+        run: git diff --exit-code -- crates/aulon-core/PUBLIC_API.txt

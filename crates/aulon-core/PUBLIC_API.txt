@@ -1,0 +1,635 @@
+pub mod aulon_core
+pub mod aulon_core::buffer_pool
+pub struct aulon_core::buffer_pool::BufferPool
+impl aulon_core::buffer_pool::BufferPool
+pub fn aulon_core::buffer_pool::BufferPool::acquire(&self) -> core::option::Option<tokio_uring::buf::fixed::handle::FixedBuf>
+pub async fn aulon_core::buffer_pool::BufferPool::acquire_async(&self) -> tokio_uring::buf::fixed::handle::FixedBuf
+pub fn aulon_core::buffer_pool::BufferPool::buffer_size(&self) -> usize
+pub fn aulon_core::buffer_pool::BufferPool::capacity(&self) -> usize
+pub fn aulon_core::buffer_pool::BufferPool::new(capacity: usize, buffer_size: usize) -> Self
+pub fn aulon_core::buffer_pool::BufferPool::register(&self) -> std::io::error::Result<()>
+impl core::clone::Clone for aulon_core::buffer_pool::BufferPool
+pub fn aulon_core::buffer_pool::BufferPool::clone(&self) -> aulon_core::buffer_pool::BufferPool
+impl core::fmt::Debug for aulon_core::buffer_pool::BufferPool
+pub fn aulon_core::buffer_pool::BufferPool::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aulon_core::buffer_pool::BufferPool
+impl !core::marker::Send for aulon_core::buffer_pool::BufferPool
+impl !core::marker::Sync for aulon_core::buffer_pool::BufferPool
+impl core::marker::Unpin for aulon_core::buffer_pool::BufferPool
+impl core::marker::UnsafeUnpin for aulon_core::buffer_pool::BufferPool
+impl !core::panic::unwind_safe::RefUnwindSafe for aulon_core::buffer_pool::BufferPool
+impl !core::panic::unwind_safe::UnwindSafe for aulon_core::buffer_pool::BufferPool
+pub const aulon_core::buffer_pool::DEFAULT_BUFFER_SIZE: usize
+pub const aulon_core::buffer_pool::DEFAULT_POOL_CAPACITY: usize
+pub mod aulon_core::connection
+pub enum aulon_core::connection::Active
+impl aulon_core::connection::State for aulon_core::connection::Active
+impl core::fmt::Debug for aulon_core::connection::Active
+pub fn aulon_core::connection::Active::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aulon_core::connection::Active
+impl core::marker::Send for aulon_core::connection::Active
+impl core::marker::Sync for aulon_core::connection::Active
+impl core::marker::Unpin for aulon_core::connection::Active
+impl core::marker::UnsafeUnpin for aulon_core::connection::Active
+impl core::panic::unwind_safe::RefUnwindSafe for aulon_core::connection::Active
+impl core::panic::unwind_safe::UnwindSafe for aulon_core::connection::Active
+pub enum aulon_core::connection::Closing
+impl aulon_core::connection::State for aulon_core::connection::Closing
+impl core::fmt::Debug for aulon_core::connection::Closing
+pub fn aulon_core::connection::Closing::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aulon_core::connection::Closing
+impl core::marker::Send for aulon_core::connection::Closing
+impl core::marker::Sync for aulon_core::connection::Closing
+impl core::marker::Unpin for aulon_core::connection::Closing
+impl core::marker::UnsafeUnpin for aulon_core::connection::Closing
+impl core::panic::unwind_safe::RefUnwindSafe for aulon_core::connection::Closing
+impl core::panic::unwind_safe::UnwindSafe for aulon_core::connection::Closing
+pub enum aulon_core::connection::ReadOutcome
+pub aulon_core::connection::ReadOutcome::Bytes(usize)
+pub aulon_core::connection::ReadOutcome::PeerClosed
+impl core::fmt::Debug for aulon_core::connection::ReadOutcome
+pub fn aulon_core::connection::ReadOutcome::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aulon_core::connection::ReadOutcome
+impl core::marker::Send for aulon_core::connection::ReadOutcome
+impl core::marker::Sync for aulon_core::connection::ReadOutcome
+impl core::marker::Unpin for aulon_core::connection::ReadOutcome
+impl core::marker::UnsafeUnpin for aulon_core::connection::ReadOutcome
+impl core::panic::unwind_safe::RefUnwindSafe for aulon_core::connection::ReadOutcome
+impl core::panic::unwind_safe::UnwindSafe for aulon_core::connection::ReadOutcome
+pub struct aulon_core::connection::Connection<S: aulon_core::connection::State>
+impl aulon_core::connection::Connection<aulon_core::connection::Active>
+pub fn aulon_core::connection::Connection<aulon_core::connection::Active>::new(stream: tokio_uring::net::tcp::stream::TcpStream, buffer: tokio_uring::buf::fixed::handle::FixedBuf) -> Self
+pub async fn aulon_core::connection::Connection<aulon_core::connection::Active>::read(&mut self) -> std::io::error::Result<aulon_core::connection::ReadOutcome>
+pub fn aulon_core::connection::Connection<aulon_core::connection::Active>::shutdown(self) -> (aulon_core::connection::Connection<aulon_core::connection::Closing>, tokio_uring::buf::fixed::handle::FixedBuf)
+pub async fn aulon_core::connection::Connection<aulon_core::connection::Active>::write_all(&mut self, len: usize) -> std::io::error::Result<()>
+impl<S: aulon_core::connection::State> core::fmt::Debug for aulon_core::connection::Connection<S>
+pub fn aulon_core::connection::Connection<S>::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<S> core::marker::Freeze for aulon_core::connection::Connection<S>
+impl<S> !core::marker::Send for aulon_core::connection::Connection<S>
+impl<S> !core::marker::Sync for aulon_core::connection::Connection<S>
+impl<S> core::marker::Unpin for aulon_core::connection::Connection<S> where S: core::marker::Unpin
+impl<S> core::marker::UnsafeUnpin for aulon_core::connection::Connection<S>
+impl<S> !core::panic::unwind_safe::RefUnwindSafe for aulon_core::connection::Connection<S>
+impl<S> !core::panic::unwind_safe::UnwindSafe for aulon_core::connection::Connection<S>
+pub trait aulon_core::connection::State: aulon_core::connection::sealed::Sealed + 'static
+impl aulon_core::connection::State for aulon_core::connection::Active
+impl aulon_core::connection::State for aulon_core::connection::Closing
+pub mod aulon_core::connection_state
+pub enum aulon_core::connection_state::CloseReason
+pub aulon_core::connection_state::CloseReason::PeerClosed
+pub aulon_core::connection_state::CloseReason::ProtocolError
+pub aulon_core::connection_state::CloseReason::SlowConsumer
+impl aulon_core::connection_state::CloseReason
+pub fn aulon_core::connection_state::CloseReason::err_text(self) -> core::option::Option<&'static [u8]>
+impl core::clone::Clone for aulon_core::connection_state::CloseReason
+pub fn aulon_core::connection_state::CloseReason::clone(&self) -> aulon_core::connection_state::CloseReason
+impl core::cmp::Eq for aulon_core::connection_state::CloseReason
+impl core::cmp::PartialEq for aulon_core::connection_state::CloseReason
+pub fn aulon_core::connection_state::CloseReason::eq(&self, other: &aulon_core::connection_state::CloseReason) -> bool
+impl core::fmt::Debug for aulon_core::connection_state::CloseReason
+pub fn aulon_core::connection_state::CloseReason::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for aulon_core::connection_state::CloseReason
+impl core::marker::StructuralPartialEq for aulon_core::connection_state::CloseReason
+impl core::marker::Freeze for aulon_core::connection_state::CloseReason
+impl core::marker::Send for aulon_core::connection_state::CloseReason
+impl core::marker::Sync for aulon_core::connection_state::CloseReason
+impl core::marker::Unpin for aulon_core::connection_state::CloseReason
+impl core::marker::UnsafeUnpin for aulon_core::connection_state::CloseReason
+impl core::panic::unwind_safe::RefUnwindSafe for aulon_core::connection_state::CloseReason
+impl core::panic::unwind_safe::UnwindSafe for aulon_core::connection_state::CloseReason
+pub enum aulon_core::connection_state::EnqueueOutcome
+pub aulon_core::connection_state::EnqueueOutcome::AlreadyClosing
+pub aulon_core::connection_state::EnqueueOutcome::Ok
+pub aulon_core::connection_state::EnqueueOutcome::SlowConsumerClosed
+impl core::cmp::Eq for aulon_core::connection_state::EnqueueOutcome
+impl core::cmp::PartialEq for aulon_core::connection_state::EnqueueOutcome
+pub fn aulon_core::connection_state::EnqueueOutcome::eq(&self, other: &aulon_core::connection_state::EnqueueOutcome) -> bool
+impl core::fmt::Debug for aulon_core::connection_state::EnqueueOutcome
+pub fn aulon_core::connection_state::EnqueueOutcome::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for aulon_core::connection_state::EnqueueOutcome
+impl core::marker::Freeze for aulon_core::connection_state::EnqueueOutcome
+impl core::marker::Send for aulon_core::connection_state::EnqueueOutcome
+impl core::marker::Sync for aulon_core::connection_state::EnqueueOutcome
+impl core::marker::Unpin for aulon_core::connection_state::EnqueueOutcome
+impl core::marker::UnsafeUnpin for aulon_core::connection_state::EnqueueOutcome
+impl core::panic::unwind_safe::RefUnwindSafe for aulon_core::connection_state::EnqueueOutcome
+impl core::panic::unwind_safe::UnwindSafe for aulon_core::connection_state::EnqueueOutcome
+pub struct aulon_core::connection_state::ConnectionState
+impl aulon_core::connection_state::ConnectionState
+pub fn aulon_core::connection_state::ConnectionState::close_reason(&self) -> core::option::Option<aulon_core::connection_state::CloseReason>
+pub fn aulon_core::connection_state::ConnectionState::drain_into(&self, dst: &mut [u8]) -> usize
+pub fn aulon_core::connection_state::ConnectionState::enqueue(&self, bytes: &[u8]) -> aulon_core::connection_state::EnqueueOutcome
+pub fn aulon_core::connection_state::ConnectionState::id(&self) -> aulon_core::subscription::ConnectionId
+pub fn aulon_core::connection_state::ConnectionState::mark_close(&self, reason: aulon_core::connection_state::CloseReason)
+pub fn aulon_core::connection_state::ConnectionState::new(id: aulon_core::subscription::ConnectionId, outbound_capacity: usize) -> Self
+pub fn aulon_core::connection_state::ConnectionState::outbound_capacity(&self) -> usize
+pub fn aulon_core::connection_state::ConnectionState::pending_bytes(&self) -> usize
+pub async fn aulon_core::connection_state::ConnectionState::wait_for_event(&self)
+impl core::fmt::Debug for aulon_core::connection_state::ConnectionState
+pub fn aulon_core::connection_state::ConnectionState::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl !core::marker::Freeze for aulon_core::connection_state::ConnectionState
+impl core::marker::Send for aulon_core::connection_state::ConnectionState
+impl !core::marker::Sync for aulon_core::connection_state::ConnectionState
+impl core::marker::Unpin for aulon_core::connection_state::ConnectionState
+impl core::marker::UnsafeUnpin for aulon_core::connection_state::ConnectionState
+impl !core::panic::unwind_safe::RefUnwindSafe for aulon_core::connection_state::ConnectionState
+impl core::panic::unwind_safe::UnwindSafe for aulon_core::connection_state::ConnectionState
+pub const aulon_core::connection_state::DEFAULT_OUTBOUND_CAPACITY: usize
+pub mod aulon_core::eventfd
+pub struct aulon_core::eventfd::EventfdReader
+impl aulon_core::eventfd::EventfdReader
+pub fn aulon_core::eventfd::EventfdReader::into_uring_file(self) -> tokio_uring::fs::file::File
+impl core::fmt::Debug for aulon_core::eventfd::EventfdReader
+pub fn aulon_core::eventfd::EventfdReader::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aulon_core::eventfd::EventfdReader
+impl core::marker::Send for aulon_core::eventfd::EventfdReader
+impl core::marker::Sync for aulon_core::eventfd::EventfdReader
+impl core::marker::Unpin for aulon_core::eventfd::EventfdReader
+impl core::marker::UnsafeUnpin for aulon_core::eventfd::EventfdReader
+impl core::panic::unwind_safe::RefUnwindSafe for aulon_core::eventfd::EventfdReader
+impl core::panic::unwind_safe::UnwindSafe for aulon_core::eventfd::EventfdReader
+pub struct aulon_core::eventfd::EventfdWaker
+impl aulon_core::eventfd::EventfdWaker
+pub fn aulon_core::eventfd::EventfdWaker::wake(&self) -> std::io::error::Result<()>
+impl core::fmt::Debug for aulon_core::eventfd::EventfdWaker
+pub fn aulon_core::eventfd::EventfdWaker::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aulon_core::eventfd::EventfdWaker
+impl core::marker::Send for aulon_core::eventfd::EventfdWaker
+impl core::marker::Sync for aulon_core::eventfd::EventfdWaker
+impl core::marker::Unpin for aulon_core::eventfd::EventfdWaker
+impl core::marker::UnsafeUnpin for aulon_core::eventfd::EventfdWaker
+impl core::panic::unwind_safe::RefUnwindSafe for aulon_core::eventfd::EventfdWaker
+impl core::panic::unwind_safe::UnwindSafe for aulon_core::eventfd::EventfdWaker
+pub fn aulon_core::eventfd::eventfd_pair() -> std::io::error::Result<(aulon_core::eventfd::EventfdReader, aulon_core::eventfd::EventfdWaker)>
+pub mod aulon_core::shard_inbox
+pub struct aulon_core::shard_inbox::PublishedFrame
+pub aulon_core::shard_inbox::PublishedFrame::payload: alloc::boxed::Box<[u8]>
+pub aulon_core::shard_inbox::PublishedFrame::reply_to: core::option::Option<alloc::boxed::Box<[u8]>>
+pub aulon_core::shard_inbox::PublishedFrame::subject: alloc::boxed::Box<[u8]>
+impl core::fmt::Debug for aulon_core::shard_inbox::PublishedFrame
+pub fn aulon_core::shard_inbox::PublishedFrame::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aulon_core::shard_inbox::PublishedFrame
+impl core::marker::Send for aulon_core::shard_inbox::PublishedFrame
+impl core::marker::Sync for aulon_core::shard_inbox::PublishedFrame
+impl core::marker::Unpin for aulon_core::shard_inbox::PublishedFrame
+impl core::marker::UnsafeUnpin for aulon_core::shard_inbox::PublishedFrame
+impl core::panic::unwind_safe::RefUnwindSafe for aulon_core::shard_inbox::PublishedFrame
+impl core::panic::unwind_safe::UnwindSafe for aulon_core::shard_inbox::PublishedFrame
+pub struct aulon_core::shard_inbox::ShardInbox<T>
+impl<T> aulon_core::shard_inbox::ShardInbox<T>
+pub fn aulon_core::shard_inbox::ShardInbox<T>::capacity(&self) -> usize
+pub fn aulon_core::shard_inbox::ShardInbox<T>::is_empty(&self) -> bool
+pub fn aulon_core::shard_inbox::ShardInbox<T>::pop(&self) -> core::option::Option<T>
+pub fn aulon_core::shard_inbox::ShardInbox<T>::push(&self, value: T) -> core::result::Result<bool, aulon_core::shard_inbox::ShardInboxFull<T>>
+pub fn aulon_core::shard_inbox::ShardInbox<T>::with_capacity(requested_capacity: usize) -> Self
+impl<T: core::marker::Send> core::marker::Send for aulon_core::shard_inbox::ShardInbox<T>
+impl<T: core::marker::Send> core::marker::Sync for aulon_core::shard_inbox::ShardInbox<T>
+impl<T> core::fmt::Debug for aulon_core::shard_inbox::ShardInbox<T>
+pub fn aulon_core::shard_inbox::ShardInbox<T>::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<T> core::ops::drop::Drop for aulon_core::shard_inbox::ShardInbox<T>
+pub fn aulon_core::shard_inbox::ShardInbox<T>::drop(&mut self)
+impl<T> !core::marker::Freeze for aulon_core::shard_inbox::ShardInbox<T>
+impl<T> core::marker::Unpin for aulon_core::shard_inbox::ShardInbox<T>
+impl<T> core::marker::UnsafeUnpin for aulon_core::shard_inbox::ShardInbox<T>
+impl<T> !core::panic::unwind_safe::RefUnwindSafe for aulon_core::shard_inbox::ShardInbox<T>
+impl<T> core::panic::unwind_safe::UnwindSafe for aulon_core::shard_inbox::ShardInbox<T> where T: core::panic::unwind_safe::UnwindSafe
+pub struct aulon_core::shard_inbox::ShardInboxFull<T>(pub T)
+impl<T: core::fmt::Debug> core::fmt::Debug for aulon_core::shard_inbox::ShardInboxFull<T>
+pub fn aulon_core::shard_inbox::ShardInboxFull<T>::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<T> core::marker::Freeze for aulon_core::shard_inbox::ShardInboxFull<T> where T: core::marker::Freeze
+impl<T> core::marker::Send for aulon_core::shard_inbox::ShardInboxFull<T> where T: core::marker::Send
+impl<T> core::marker::Sync for aulon_core::shard_inbox::ShardInboxFull<T> where T: core::marker::Sync
+impl<T> core::marker::Unpin for aulon_core::shard_inbox::ShardInboxFull<T> where T: core::marker::Unpin
+impl<T> core::marker::UnsafeUnpin for aulon_core::shard_inbox::ShardInboxFull<T> where T: core::marker::UnsafeUnpin
+impl<T> core::panic::unwind_safe::RefUnwindSafe for aulon_core::shard_inbox::ShardInboxFull<T> where T: core::panic::unwind_safe::RefUnwindSafe
+impl<T> core::panic::unwind_safe::UnwindSafe for aulon_core::shard_inbox::ShardInboxFull<T> where T: core::panic::unwind_safe::UnwindSafe
+pub mod aulon_core::subscription
+pub enum aulon_core::subscription::SubjectError
+pub aulon_core::subscription::SubjectError::Empty
+pub aulon_core::subscription::SubjectError::EmptyToken
+pub aulon_core::subscription::SubjectError::InvalidGreaterPosition
+pub aulon_core::subscription::SubjectError::WildcardInPublish
+impl core::clone::Clone for aulon_core::subscription::SubjectError
+pub fn aulon_core::subscription::SubjectError::clone(&self) -> aulon_core::subscription::SubjectError
+impl core::cmp::Eq for aulon_core::subscription::SubjectError
+impl core::cmp::PartialEq for aulon_core::subscription::SubjectError
+pub fn aulon_core::subscription::SubjectError::eq(&self, other: &aulon_core::subscription::SubjectError) -> bool
+impl core::fmt::Debug for aulon_core::subscription::SubjectError
+pub fn aulon_core::subscription::SubjectError::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for aulon_core::subscription::SubjectError
+impl core::marker::StructuralPartialEq for aulon_core::subscription::SubjectError
+impl core::marker::Freeze for aulon_core::subscription::SubjectError
+impl core::marker::Send for aulon_core::subscription::SubjectError
+impl core::marker::Sync for aulon_core::subscription::SubjectError
+impl core::marker::Unpin for aulon_core::subscription::SubjectError
+impl core::marker::UnsafeUnpin for aulon_core::subscription::SubjectError
+impl core::panic::unwind_safe::RefUnwindSafe for aulon_core::subscription::SubjectError
+impl core::panic::unwind_safe::UnwindSafe for aulon_core::subscription::SubjectError
+pub struct aulon_core::subscription::ConnectionId(_)
+impl aulon_core::subscription::ConnectionId
+pub fn aulon_core::subscription::ConnectionId::get(self) -> u32
+pub fn aulon_core::subscription::ConnectionId::new(raw: u32) -> Self
+impl core::clone::Clone for aulon_core::subscription::ConnectionId
+pub fn aulon_core::subscription::ConnectionId::clone(&self) -> aulon_core::subscription::ConnectionId
+impl core::cmp::Eq for aulon_core::subscription::ConnectionId
+impl core::cmp::Ord for aulon_core::subscription::ConnectionId
+pub fn aulon_core::subscription::ConnectionId::cmp(&self, other: &aulon_core::subscription::ConnectionId) -> core::cmp::Ordering
+impl core::cmp::PartialEq for aulon_core::subscription::ConnectionId
+pub fn aulon_core::subscription::ConnectionId::eq(&self, other: &aulon_core::subscription::ConnectionId) -> bool
+impl core::cmp::PartialOrd for aulon_core::subscription::ConnectionId
+pub fn aulon_core::subscription::ConnectionId::partial_cmp(&self, other: &aulon_core::subscription::ConnectionId) -> core::option::Option<core::cmp::Ordering>
+impl core::fmt::Debug for aulon_core::subscription::ConnectionId
+pub fn aulon_core::subscription::ConnectionId::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for aulon_core::subscription::ConnectionId
+pub fn aulon_core::subscription::ConnectionId::hash<__H: core::hash::Hasher>(&self, state: &mut __H)
+impl core::marker::Copy for aulon_core::subscription::ConnectionId
+impl core::marker::StructuralPartialEq for aulon_core::subscription::ConnectionId
+impl core::marker::Freeze for aulon_core::subscription::ConnectionId
+impl core::marker::Send for aulon_core::subscription::ConnectionId
+impl core::marker::Sync for aulon_core::subscription::ConnectionId
+impl core::marker::Unpin for aulon_core::subscription::ConnectionId
+impl core::marker::UnsafeUnpin for aulon_core::subscription::ConnectionId
+impl core::panic::unwind_safe::RefUnwindSafe for aulon_core::subscription::ConnectionId
+impl core::panic::unwind_safe::UnwindSafe for aulon_core::subscription::ConnectionId
+pub struct aulon_core::subscription::Sub
+pub aulon_core::subscription::Sub::conn_id: aulon_core::subscription::ConnectionId
+pub aulon_core::subscription::Sub::queue_group: core::option::Option<alloc::boxed::Box<[u8]>>
+pub aulon_core::subscription::Sub::sid: alloc::boxed::Box<[u8]>
+impl core::clone::Clone for aulon_core::subscription::Sub
+pub fn aulon_core::subscription::Sub::clone(&self) -> aulon_core::subscription::Sub
+impl core::cmp::Eq for aulon_core::subscription::Sub
+impl core::cmp::PartialEq for aulon_core::subscription::Sub
+pub fn aulon_core::subscription::Sub::eq(&self, other: &aulon_core::subscription::Sub) -> bool
+impl core::fmt::Debug for aulon_core::subscription::Sub
+pub fn aulon_core::subscription::Sub::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for aulon_core::subscription::Sub
+impl core::marker::Freeze for aulon_core::subscription::Sub
+impl core::marker::Send for aulon_core::subscription::Sub
+impl core::marker::Sync for aulon_core::subscription::Sub
+impl core::marker::Unpin for aulon_core::subscription::Sub
+impl core::marker::UnsafeUnpin for aulon_core::subscription::Sub
+impl core::panic::unwind_safe::RefUnwindSafe for aulon_core::subscription::Sub
+impl core::panic::unwind_safe::UnwindSafe for aulon_core::subscription::Sub
+pub struct aulon_core::subscription::SubscriptionTrie
+impl aulon_core::subscription::SubscriptionTrie
+pub fn aulon_core::subscription::SubscriptionTrie::for_each_match<F: core::ops::function::FnMut(&aulon_core::subscription::Sub)>(&self, subject: &[u8], f: F) -> core::result::Result<(), aulon_core::subscription::SubjectError>
+pub fn aulon_core::subscription::SubscriptionTrie::new() -> Self
+pub fn aulon_core::subscription::SubscriptionTrie::subscribe(&mut self, subject: &[u8], sub: aulon_core::subscription::Sub) -> core::result::Result<(), aulon_core::subscription::SubjectError>
+pub fn aulon_core::subscription::SubscriptionTrie::total_subscriptions(&self) -> usize
+pub fn aulon_core::subscription::SubscriptionTrie::unsubscribe(&mut self, subject: &[u8], conn_id: aulon_core::subscription::ConnectionId, sid: &[u8]) -> bool
+impl core::default::Default for aulon_core::subscription::SubscriptionTrie
+pub fn aulon_core::subscription::SubscriptionTrie::default() -> aulon_core::subscription::SubscriptionTrie
+impl core::fmt::Debug for aulon_core::subscription::SubscriptionTrie
+pub fn aulon_core::subscription::SubscriptionTrie::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aulon_core::subscription::SubscriptionTrie
+impl core::marker::Send for aulon_core::subscription::SubscriptionTrie
+impl core::marker::Sync for aulon_core::subscription::SubscriptionTrie
+impl core::marker::Unpin for aulon_core::subscription::SubscriptionTrie
+impl core::marker::UnsafeUnpin for aulon_core::subscription::SubscriptionTrie
+impl core::panic::unwind_safe::RefUnwindSafe for aulon_core::subscription::SubscriptionTrie
+impl core::panic::unwind_safe::UnwindSafe for aulon_core::subscription::SubscriptionTrie
+pub mod aulon_core::topology
+pub struct aulon_core::topology::Shard
+pub aulon_core::topology::Shard::cpus: alloc::vec::Vec<u32>
+pub aulon_core::topology::Shard::shard_id: u32
+impl core::clone::Clone for aulon_core::topology::Shard
+pub fn aulon_core::topology::Shard::clone(&self) -> aulon_core::topology::Shard
+impl core::fmt::Debug for aulon_core::topology::Shard
+pub fn aulon_core::topology::Shard::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aulon_core::topology::Shard
+impl core::marker::Send for aulon_core::topology::Shard
+impl core::marker::Sync for aulon_core::topology::Shard
+impl core::marker::Unpin for aulon_core::topology::Shard
+impl core::marker::UnsafeUnpin for aulon_core::topology::Shard
+impl core::panic::unwind_safe::RefUnwindSafe for aulon_core::topology::Shard
+impl core::panic::unwind_safe::UnwindSafe for aulon_core::topology::Shard
+pub struct aulon_core::topology::Topology
+pub aulon_core::topology::Topology::shards: alloc::vec::Vec<aulon_core::topology::Shard>
+impl aulon_core::topology::Topology
+pub fn aulon_core::topology::Topology::shard_count(&self) -> usize
+pub fn aulon_core::topology::Topology::single() -> Self
+impl core::clone::Clone for aulon_core::topology::Topology
+pub fn aulon_core::topology::Topology::clone(&self) -> aulon_core::topology::Topology
+impl core::fmt::Debug for aulon_core::topology::Topology
+pub fn aulon_core::topology::Topology::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aulon_core::topology::Topology
+impl core::marker::Send for aulon_core::topology::Topology
+impl core::marker::Sync for aulon_core::topology::Topology
+impl core::marker::Unpin for aulon_core::topology::Topology
+impl core::marker::UnsafeUnpin for aulon_core::topology::Topology
+impl core::panic::unwind_safe::RefUnwindSafe for aulon_core::topology::Topology
+impl core::panic::unwind_safe::UnwindSafe for aulon_core::topology::Topology
+pub fn aulon_core::topology::detect() -> aulon_core::topology::Topology
+pub enum aulon_core::Active
+impl aulon_core::connection::State for aulon_core::connection::Active
+impl core::fmt::Debug for aulon_core::connection::Active
+pub fn aulon_core::connection::Active::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aulon_core::connection::Active
+impl core::marker::Send for aulon_core::connection::Active
+impl core::marker::Sync for aulon_core::connection::Active
+impl core::marker::Unpin for aulon_core::connection::Active
+impl core::marker::UnsafeUnpin for aulon_core::connection::Active
+impl core::panic::unwind_safe::RefUnwindSafe for aulon_core::connection::Active
+impl core::panic::unwind_safe::UnwindSafe for aulon_core::connection::Active
+pub enum aulon_core::CloseReason
+pub aulon_core::CloseReason::PeerClosed
+pub aulon_core::CloseReason::ProtocolError
+pub aulon_core::CloseReason::SlowConsumer
+impl aulon_core::connection_state::CloseReason
+pub fn aulon_core::connection_state::CloseReason::err_text(self) -> core::option::Option<&'static [u8]>
+impl core::clone::Clone for aulon_core::connection_state::CloseReason
+pub fn aulon_core::connection_state::CloseReason::clone(&self) -> aulon_core::connection_state::CloseReason
+impl core::cmp::Eq for aulon_core::connection_state::CloseReason
+impl core::cmp::PartialEq for aulon_core::connection_state::CloseReason
+pub fn aulon_core::connection_state::CloseReason::eq(&self, other: &aulon_core::connection_state::CloseReason) -> bool
+impl core::fmt::Debug for aulon_core::connection_state::CloseReason
+pub fn aulon_core::connection_state::CloseReason::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for aulon_core::connection_state::CloseReason
+impl core::marker::StructuralPartialEq for aulon_core::connection_state::CloseReason
+impl core::marker::Freeze for aulon_core::connection_state::CloseReason
+impl core::marker::Send for aulon_core::connection_state::CloseReason
+impl core::marker::Sync for aulon_core::connection_state::CloseReason
+impl core::marker::Unpin for aulon_core::connection_state::CloseReason
+impl core::marker::UnsafeUnpin for aulon_core::connection_state::CloseReason
+impl core::panic::unwind_safe::RefUnwindSafe for aulon_core::connection_state::CloseReason
+impl core::panic::unwind_safe::UnwindSafe for aulon_core::connection_state::CloseReason
+pub enum aulon_core::Closing
+impl aulon_core::connection::State for aulon_core::connection::Closing
+impl core::fmt::Debug for aulon_core::connection::Closing
+pub fn aulon_core::connection::Closing::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aulon_core::connection::Closing
+impl core::marker::Send for aulon_core::connection::Closing
+impl core::marker::Sync for aulon_core::connection::Closing
+impl core::marker::Unpin for aulon_core::connection::Closing
+impl core::marker::UnsafeUnpin for aulon_core::connection::Closing
+impl core::panic::unwind_safe::RefUnwindSafe for aulon_core::connection::Closing
+impl core::panic::unwind_safe::UnwindSafe for aulon_core::connection::Closing
+pub enum aulon_core::EnqueueOutcome
+pub aulon_core::EnqueueOutcome::AlreadyClosing
+pub aulon_core::EnqueueOutcome::Ok
+pub aulon_core::EnqueueOutcome::SlowConsumerClosed
+impl core::cmp::Eq for aulon_core::connection_state::EnqueueOutcome
+impl core::cmp::PartialEq for aulon_core::connection_state::EnqueueOutcome
+pub fn aulon_core::connection_state::EnqueueOutcome::eq(&self, other: &aulon_core::connection_state::EnqueueOutcome) -> bool
+impl core::fmt::Debug for aulon_core::connection_state::EnqueueOutcome
+pub fn aulon_core::connection_state::EnqueueOutcome::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for aulon_core::connection_state::EnqueueOutcome
+impl core::marker::Freeze for aulon_core::connection_state::EnqueueOutcome
+impl core::marker::Send for aulon_core::connection_state::EnqueueOutcome
+impl core::marker::Sync for aulon_core::connection_state::EnqueueOutcome
+impl core::marker::Unpin for aulon_core::connection_state::EnqueueOutcome
+impl core::marker::UnsafeUnpin for aulon_core::connection_state::EnqueueOutcome
+impl core::panic::unwind_safe::RefUnwindSafe for aulon_core::connection_state::EnqueueOutcome
+impl core::panic::unwind_safe::UnwindSafe for aulon_core::connection_state::EnqueueOutcome
+pub enum aulon_core::ReadOutcome
+pub aulon_core::ReadOutcome::Bytes(usize)
+pub aulon_core::ReadOutcome::PeerClosed
+impl core::fmt::Debug for aulon_core::connection::ReadOutcome
+pub fn aulon_core::connection::ReadOutcome::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aulon_core::connection::ReadOutcome
+impl core::marker::Send for aulon_core::connection::ReadOutcome
+impl core::marker::Sync for aulon_core::connection::ReadOutcome
+impl core::marker::Unpin for aulon_core::connection::ReadOutcome
+impl core::marker::UnsafeUnpin for aulon_core::connection::ReadOutcome
+impl core::panic::unwind_safe::RefUnwindSafe for aulon_core::connection::ReadOutcome
+impl core::panic::unwind_safe::UnwindSafe for aulon_core::connection::ReadOutcome
+pub enum aulon_core::SubjectError
+pub aulon_core::SubjectError::Empty
+pub aulon_core::SubjectError::EmptyToken
+pub aulon_core::SubjectError::InvalidGreaterPosition
+pub aulon_core::SubjectError::WildcardInPublish
+impl core::clone::Clone for aulon_core::subscription::SubjectError
+pub fn aulon_core::subscription::SubjectError::clone(&self) -> aulon_core::subscription::SubjectError
+impl core::cmp::Eq for aulon_core::subscription::SubjectError
+impl core::cmp::PartialEq for aulon_core::subscription::SubjectError
+pub fn aulon_core::subscription::SubjectError::eq(&self, other: &aulon_core::subscription::SubjectError) -> bool
+impl core::fmt::Debug for aulon_core::subscription::SubjectError
+pub fn aulon_core::subscription::SubjectError::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for aulon_core::subscription::SubjectError
+impl core::marker::StructuralPartialEq for aulon_core::subscription::SubjectError
+impl core::marker::Freeze for aulon_core::subscription::SubjectError
+impl core::marker::Send for aulon_core::subscription::SubjectError
+impl core::marker::Sync for aulon_core::subscription::SubjectError
+impl core::marker::Unpin for aulon_core::subscription::SubjectError
+impl core::marker::UnsafeUnpin for aulon_core::subscription::SubjectError
+impl core::panic::unwind_safe::RefUnwindSafe for aulon_core::subscription::SubjectError
+impl core::panic::unwind_safe::UnwindSafe for aulon_core::subscription::SubjectError
+pub struct aulon_core::BufferPool
+impl aulon_core::buffer_pool::BufferPool
+pub fn aulon_core::buffer_pool::BufferPool::acquire(&self) -> core::option::Option<tokio_uring::buf::fixed::handle::FixedBuf>
+pub async fn aulon_core::buffer_pool::BufferPool::acquire_async(&self) -> tokio_uring::buf::fixed::handle::FixedBuf
+pub fn aulon_core::buffer_pool::BufferPool::buffer_size(&self) -> usize
+pub fn aulon_core::buffer_pool::BufferPool::capacity(&self) -> usize
+pub fn aulon_core::buffer_pool::BufferPool::new(capacity: usize, buffer_size: usize) -> Self
+pub fn aulon_core::buffer_pool::BufferPool::register(&self) -> std::io::error::Result<()>
+impl core::clone::Clone for aulon_core::buffer_pool::BufferPool
+pub fn aulon_core::buffer_pool::BufferPool::clone(&self) -> aulon_core::buffer_pool::BufferPool
+impl core::fmt::Debug for aulon_core::buffer_pool::BufferPool
+pub fn aulon_core::buffer_pool::BufferPool::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aulon_core::buffer_pool::BufferPool
+impl !core::marker::Send for aulon_core::buffer_pool::BufferPool
+impl !core::marker::Sync for aulon_core::buffer_pool::BufferPool
+impl core::marker::Unpin for aulon_core::buffer_pool::BufferPool
+impl core::marker::UnsafeUnpin for aulon_core::buffer_pool::BufferPool
+impl !core::panic::unwind_safe::RefUnwindSafe for aulon_core::buffer_pool::BufferPool
+impl !core::panic::unwind_safe::UnwindSafe for aulon_core::buffer_pool::BufferPool
+pub struct aulon_core::Connection<S: aulon_core::connection::State>
+impl aulon_core::connection::Connection<aulon_core::connection::Active>
+pub fn aulon_core::connection::Connection<aulon_core::connection::Active>::new(stream: tokio_uring::net::tcp::stream::TcpStream, buffer: tokio_uring::buf::fixed::handle::FixedBuf) -> Self
+pub async fn aulon_core::connection::Connection<aulon_core::connection::Active>::read(&mut self) -> std::io::error::Result<aulon_core::connection::ReadOutcome>
+pub fn aulon_core::connection::Connection<aulon_core::connection::Active>::shutdown(self) -> (aulon_core::connection::Connection<aulon_core::connection::Closing>, tokio_uring::buf::fixed::handle::FixedBuf)
+pub async fn aulon_core::connection::Connection<aulon_core::connection::Active>::write_all(&mut self, len: usize) -> std::io::error::Result<()>
+impl<S: aulon_core::connection::State> core::fmt::Debug for aulon_core::connection::Connection<S>
+pub fn aulon_core::connection::Connection<S>::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<S> core::marker::Freeze for aulon_core::connection::Connection<S>
+impl<S> !core::marker::Send for aulon_core::connection::Connection<S>
+impl<S> !core::marker::Sync for aulon_core::connection::Connection<S>
+impl<S> core::marker::Unpin for aulon_core::connection::Connection<S> where S: core::marker::Unpin
+impl<S> core::marker::UnsafeUnpin for aulon_core::connection::Connection<S>
+impl<S> !core::panic::unwind_safe::RefUnwindSafe for aulon_core::connection::Connection<S>
+impl<S> !core::panic::unwind_safe::UnwindSafe for aulon_core::connection::Connection<S>
+pub struct aulon_core::ConnectionId(_)
+impl aulon_core::subscription::ConnectionId
+pub fn aulon_core::subscription::ConnectionId::get(self) -> u32
+pub fn aulon_core::subscription::ConnectionId::new(raw: u32) -> Self
+impl core::clone::Clone for aulon_core::subscription::ConnectionId
+pub fn aulon_core::subscription::ConnectionId::clone(&self) -> aulon_core::subscription::ConnectionId
+impl core::cmp::Eq for aulon_core::subscription::ConnectionId
+impl core::cmp::Ord for aulon_core::subscription::ConnectionId
+pub fn aulon_core::subscription::ConnectionId::cmp(&self, other: &aulon_core::subscription::ConnectionId) -> core::cmp::Ordering
+impl core::cmp::PartialEq for aulon_core::subscription::ConnectionId
+pub fn aulon_core::subscription::ConnectionId::eq(&self, other: &aulon_core::subscription::ConnectionId) -> bool
+impl core::cmp::PartialOrd for aulon_core::subscription::ConnectionId
+pub fn aulon_core::subscription::ConnectionId::partial_cmp(&self, other: &aulon_core::subscription::ConnectionId) -> core::option::Option<core::cmp::Ordering>
+impl core::fmt::Debug for aulon_core::subscription::ConnectionId
+pub fn aulon_core::subscription::ConnectionId::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for aulon_core::subscription::ConnectionId
+pub fn aulon_core::subscription::ConnectionId::hash<__H: core::hash::Hasher>(&self, state: &mut __H)
+impl core::marker::Copy for aulon_core::subscription::ConnectionId
+impl core::marker::StructuralPartialEq for aulon_core::subscription::ConnectionId
+impl core::marker::Freeze for aulon_core::subscription::ConnectionId
+impl core::marker::Send for aulon_core::subscription::ConnectionId
+impl core::marker::Sync for aulon_core::subscription::ConnectionId
+impl core::marker::Unpin for aulon_core::subscription::ConnectionId
+impl core::marker::UnsafeUnpin for aulon_core::subscription::ConnectionId
+impl core::panic::unwind_safe::RefUnwindSafe for aulon_core::subscription::ConnectionId
+impl core::panic::unwind_safe::UnwindSafe for aulon_core::subscription::ConnectionId
+pub struct aulon_core::ConnectionState
+impl aulon_core::connection_state::ConnectionState
+pub fn aulon_core::connection_state::ConnectionState::close_reason(&self) -> core::option::Option<aulon_core::connection_state::CloseReason>
+pub fn aulon_core::connection_state::ConnectionState::drain_into(&self, dst: &mut [u8]) -> usize
+pub fn aulon_core::connection_state::ConnectionState::enqueue(&self, bytes: &[u8]) -> aulon_core::connection_state::EnqueueOutcome
+pub fn aulon_core::connection_state::ConnectionState::id(&self) -> aulon_core::subscription::ConnectionId
+pub fn aulon_core::connection_state::ConnectionState::mark_close(&self, reason: aulon_core::connection_state::CloseReason)
+pub fn aulon_core::connection_state::ConnectionState::new(id: aulon_core::subscription::ConnectionId, outbound_capacity: usize) -> Self
+pub fn aulon_core::connection_state::ConnectionState::outbound_capacity(&self) -> usize
+pub fn aulon_core::connection_state::ConnectionState::pending_bytes(&self) -> usize
+pub async fn aulon_core::connection_state::ConnectionState::wait_for_event(&self)
+impl core::fmt::Debug for aulon_core::connection_state::ConnectionState
+pub fn aulon_core::connection_state::ConnectionState::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl !core::marker::Freeze for aulon_core::connection_state::ConnectionState
+impl core::marker::Send for aulon_core::connection_state::ConnectionState
+impl !core::marker::Sync for aulon_core::connection_state::ConnectionState
+impl core::marker::Unpin for aulon_core::connection_state::ConnectionState
+impl core::marker::UnsafeUnpin for aulon_core::connection_state::ConnectionState
+impl !core::panic::unwind_safe::RefUnwindSafe for aulon_core::connection_state::ConnectionState
+impl core::panic::unwind_safe::UnwindSafe for aulon_core::connection_state::ConnectionState
+pub struct aulon_core::EventfdReader
+impl aulon_core::eventfd::EventfdReader
+pub fn aulon_core::eventfd::EventfdReader::into_uring_file(self) -> tokio_uring::fs::file::File
+impl core::fmt::Debug for aulon_core::eventfd::EventfdReader
+pub fn aulon_core::eventfd::EventfdReader::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aulon_core::eventfd::EventfdReader
+impl core::marker::Send for aulon_core::eventfd::EventfdReader
+impl core::marker::Sync for aulon_core::eventfd::EventfdReader
+impl core::marker::Unpin for aulon_core::eventfd::EventfdReader
+impl core::marker::UnsafeUnpin for aulon_core::eventfd::EventfdReader
+impl core::panic::unwind_safe::RefUnwindSafe for aulon_core::eventfd::EventfdReader
+impl core::panic::unwind_safe::UnwindSafe for aulon_core::eventfd::EventfdReader
+pub struct aulon_core::EventfdWaker
+impl aulon_core::eventfd::EventfdWaker
+pub fn aulon_core::eventfd::EventfdWaker::wake(&self) -> std::io::error::Result<()>
+impl core::fmt::Debug for aulon_core::eventfd::EventfdWaker
+pub fn aulon_core::eventfd::EventfdWaker::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aulon_core::eventfd::EventfdWaker
+impl core::marker::Send for aulon_core::eventfd::EventfdWaker
+impl core::marker::Sync for aulon_core::eventfd::EventfdWaker
+impl core::marker::Unpin for aulon_core::eventfd::EventfdWaker
+impl core::marker::UnsafeUnpin for aulon_core::eventfd::EventfdWaker
+impl core::panic::unwind_safe::RefUnwindSafe for aulon_core::eventfd::EventfdWaker
+impl core::panic::unwind_safe::UnwindSafe for aulon_core::eventfd::EventfdWaker
+pub struct aulon_core::PublishedFrame
+pub aulon_core::PublishedFrame::payload: alloc::boxed::Box<[u8]>
+pub aulon_core::PublishedFrame::reply_to: core::option::Option<alloc::boxed::Box<[u8]>>
+pub aulon_core::PublishedFrame::subject: alloc::boxed::Box<[u8]>
+impl core::fmt::Debug for aulon_core::shard_inbox::PublishedFrame
+pub fn aulon_core::shard_inbox::PublishedFrame::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aulon_core::shard_inbox::PublishedFrame
+impl core::marker::Send for aulon_core::shard_inbox::PublishedFrame
+impl core::marker::Sync for aulon_core::shard_inbox::PublishedFrame
+impl core::marker::Unpin for aulon_core::shard_inbox::PublishedFrame
+impl core::marker::UnsafeUnpin for aulon_core::shard_inbox::PublishedFrame
+impl core::panic::unwind_safe::RefUnwindSafe for aulon_core::shard_inbox::PublishedFrame
+impl core::panic::unwind_safe::UnwindSafe for aulon_core::shard_inbox::PublishedFrame
+pub struct aulon_core::Shard
+pub aulon_core::Shard::cpus: alloc::vec::Vec<u32>
+pub aulon_core::Shard::shard_id: u32
+impl core::clone::Clone for aulon_core::topology::Shard
+pub fn aulon_core::topology::Shard::clone(&self) -> aulon_core::topology::Shard
+impl core::fmt::Debug for aulon_core::topology::Shard
+pub fn aulon_core::topology::Shard::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aulon_core::topology::Shard
+impl core::marker::Send for aulon_core::topology::Shard
+impl core::marker::Sync for aulon_core::topology::Shard
+impl core::marker::Unpin for aulon_core::topology::Shard
+impl core::marker::UnsafeUnpin for aulon_core::topology::Shard
+impl core::panic::unwind_safe::RefUnwindSafe for aulon_core::topology::Shard
+impl core::panic::unwind_safe::UnwindSafe for aulon_core::topology::Shard
+pub struct aulon_core::ShardInbox<T>
+impl<T> aulon_core::shard_inbox::ShardInbox<T>
+pub fn aulon_core::shard_inbox::ShardInbox<T>::capacity(&self) -> usize
+pub fn aulon_core::shard_inbox::ShardInbox<T>::is_empty(&self) -> bool
+pub fn aulon_core::shard_inbox::ShardInbox<T>::pop(&self) -> core::option::Option<T>
+pub fn aulon_core::shard_inbox::ShardInbox<T>::push(&self, value: T) -> core::result::Result<bool, aulon_core::shard_inbox::ShardInboxFull<T>>
+pub fn aulon_core::shard_inbox::ShardInbox<T>::with_capacity(requested_capacity: usize) -> Self
+impl<T: core::marker::Send> core::marker::Send for aulon_core::shard_inbox::ShardInbox<T>
+impl<T: core::marker::Send> core::marker::Sync for aulon_core::shard_inbox::ShardInbox<T>
+impl<T> core::fmt::Debug for aulon_core::shard_inbox::ShardInbox<T>
+pub fn aulon_core::shard_inbox::ShardInbox<T>::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<T> core::ops::drop::Drop for aulon_core::shard_inbox::ShardInbox<T>
+pub fn aulon_core::shard_inbox::ShardInbox<T>::drop(&mut self)
+impl<T> !core::marker::Freeze for aulon_core::shard_inbox::ShardInbox<T>
+impl<T> core::marker::Unpin for aulon_core::shard_inbox::ShardInbox<T>
+impl<T> core::marker::UnsafeUnpin for aulon_core::shard_inbox::ShardInbox<T>
+impl<T> !core::panic::unwind_safe::RefUnwindSafe for aulon_core::shard_inbox::ShardInbox<T>
+impl<T> core::panic::unwind_safe::UnwindSafe for aulon_core::shard_inbox::ShardInbox<T> where T: core::panic::unwind_safe::UnwindSafe
+pub struct aulon_core::ShardInboxFull<T>(pub T)
+impl<T: core::fmt::Debug> core::fmt::Debug for aulon_core::shard_inbox::ShardInboxFull<T>
+pub fn aulon_core::shard_inbox::ShardInboxFull<T>::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<T> core::marker::Freeze for aulon_core::shard_inbox::ShardInboxFull<T> where T: core::marker::Freeze
+impl<T> core::marker::Send for aulon_core::shard_inbox::ShardInboxFull<T> where T: core::marker::Send
+impl<T> core::marker::Sync for aulon_core::shard_inbox::ShardInboxFull<T> where T: core::marker::Sync
+impl<T> core::marker::Unpin for aulon_core::shard_inbox::ShardInboxFull<T> where T: core::marker::Unpin
+impl<T> core::marker::UnsafeUnpin for aulon_core::shard_inbox::ShardInboxFull<T> where T: core::marker::UnsafeUnpin
+impl<T> core::panic::unwind_safe::RefUnwindSafe for aulon_core::shard_inbox::ShardInboxFull<T> where T: core::panic::unwind_safe::RefUnwindSafe
+impl<T> core::panic::unwind_safe::UnwindSafe for aulon_core::shard_inbox::ShardInboxFull<T> where T: core::panic::unwind_safe::UnwindSafe
+pub struct aulon_core::Sub
+pub aulon_core::Sub::conn_id: aulon_core::subscription::ConnectionId
+pub aulon_core::Sub::queue_group: core::option::Option<alloc::boxed::Box<[u8]>>
+pub aulon_core::Sub::sid: alloc::boxed::Box<[u8]>
+impl core::clone::Clone for aulon_core::subscription::Sub
+pub fn aulon_core::subscription::Sub::clone(&self) -> aulon_core::subscription::Sub
+impl core::cmp::Eq for aulon_core::subscription::Sub
+impl core::cmp::PartialEq for aulon_core::subscription::Sub
+pub fn aulon_core::subscription::Sub::eq(&self, other: &aulon_core::subscription::Sub) -> bool
+impl core::fmt::Debug for aulon_core::subscription::Sub
+pub fn aulon_core::subscription::Sub::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for aulon_core::subscription::Sub
+impl core::marker::Freeze for aulon_core::subscription::Sub
+impl core::marker::Send for aulon_core::subscription::Sub
+impl core::marker::Sync for aulon_core::subscription::Sub
+impl core::marker::Unpin for aulon_core::subscription::Sub
+impl core::marker::UnsafeUnpin for aulon_core::subscription::Sub
+impl core::panic::unwind_safe::RefUnwindSafe for aulon_core::subscription::Sub
+impl core::panic::unwind_safe::UnwindSafe for aulon_core::subscription::Sub
+pub struct aulon_core::SubscriptionTrie
+impl aulon_core::subscription::SubscriptionTrie
+pub fn aulon_core::subscription::SubscriptionTrie::for_each_match<F: core::ops::function::FnMut(&aulon_core::subscription::Sub)>(&self, subject: &[u8], f: F) -> core::result::Result<(), aulon_core::subscription::SubjectError>
+pub fn aulon_core::subscription::SubscriptionTrie::new() -> Self
+pub fn aulon_core::subscription::SubscriptionTrie::subscribe(&mut self, subject: &[u8], sub: aulon_core::subscription::Sub) -> core::result::Result<(), aulon_core::subscription::SubjectError>
+pub fn aulon_core::subscription::SubscriptionTrie::total_subscriptions(&self) -> usize
+pub fn aulon_core::subscription::SubscriptionTrie::unsubscribe(&mut self, subject: &[u8], conn_id: aulon_core::subscription::ConnectionId, sid: &[u8]) -> bool
+impl core::default::Default for aulon_core::subscription::SubscriptionTrie
+pub fn aulon_core::subscription::SubscriptionTrie::default() -> aulon_core::subscription::SubscriptionTrie
+impl core::fmt::Debug for aulon_core::subscription::SubscriptionTrie
+pub fn aulon_core::subscription::SubscriptionTrie::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aulon_core::subscription::SubscriptionTrie
+impl core::marker::Send for aulon_core::subscription::SubscriptionTrie
+impl core::marker::Sync for aulon_core::subscription::SubscriptionTrie
+impl core::marker::Unpin for aulon_core::subscription::SubscriptionTrie
+impl core::marker::UnsafeUnpin for aulon_core::subscription::SubscriptionTrie
+impl core::panic::unwind_safe::RefUnwindSafe for aulon_core::subscription::SubscriptionTrie
+impl core::panic::unwind_safe::UnwindSafe for aulon_core::subscription::SubscriptionTrie
+pub struct aulon_core::Topology
+pub aulon_core::Topology::shards: alloc::vec::Vec<aulon_core::topology::Shard>
+impl aulon_core::topology::Topology
+pub fn aulon_core::topology::Topology::shard_count(&self) -> usize
+pub fn aulon_core::topology::Topology::single() -> Self
+impl core::clone::Clone for aulon_core::topology::Topology
+pub fn aulon_core::topology::Topology::clone(&self) -> aulon_core::topology::Topology
+impl core::fmt::Debug for aulon_core::topology::Topology
+pub fn aulon_core::topology::Topology::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aulon_core::topology::Topology
+impl core::marker::Send for aulon_core::topology::Topology
+impl core::marker::Sync for aulon_core::topology::Topology
+impl core::marker::Unpin for aulon_core::topology::Topology
+impl core::marker::UnsafeUnpin for aulon_core::topology::Topology
+impl core::panic::unwind_safe::RefUnwindSafe for aulon_core::topology::Topology
+impl core::panic::unwind_safe::UnwindSafe for aulon_core::topology::Topology
+pub const aulon_core::DEFAULT_BUFFER_SIZE: usize
+pub const aulon_core::DEFAULT_OUTBOUND_CAPACITY: usize
+pub const aulon_core::DEFAULT_POOL_CAPACITY: usize
+pub trait aulon_core::State: aulon_core::connection::sealed::Sealed + 'static
+impl aulon_core::connection::State for aulon_core::connection::Active
+impl aulon_core::connection::State for aulon_core::connection::Closing
+pub fn aulon_core::eventfd_pair() -> std::io::error::Result<(aulon_core::eventfd::EventfdReader, aulon_core::eventfd::EventfdWaker)>

@@ -29,8 +29,8 @@ use std::mem::MaybeUninit;
 
 /// One frame in flight from a publisher shard to a peer shard.
 ///
-/// Shared via [`Arc`] so the wire payload is encoded exactly once per
-/// `PUB` regardless of fan-out.
+/// Shared via [`std::sync::Arc`] so the wire payload is encoded exactly
+/// once per `PUB` regardless of fan-out.
 #[derive(Debug)]
 pub struct PublishedFrame {
     /// The publish subject (pre-validated by the publisher's shard).
