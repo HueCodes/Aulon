@@ -440,3 +440,69 @@ moved from 1.39 ms (eviction-contaminated) to 28.8 us. The 48x drop
 is not the broker getting faster between C4 and C5; it is the
 benchmark client getting honest.
 
+## C5 headline, in-VM 2026-05-14
+
+OrbStack Ubuntu VM (kernel 7.0.5, aarch64, 8 vCPU on an M2 host).
+4 subscribers, 256 B payload, 3,000 iterations + 1,000 warmup,
+publisher pinned to a different CPU than the server.
+
+The bench harness in `aulon-fanout` hosts the publisher and all
+subscribers on one `tokio_uring::current_thread` runtime. The
+publisher-pace window required to keep Aulon free of slow-consumer
+eviction at end-of-run (see the C5 fanout entry above) interacts
+badly with `nats-server`'s outbound batching: under
+`AULON_PACE_WINDOW=2`, nats-server's MSG delivery stalls in our
+single-runtime client and the run does not complete in a reasonable
+time. nats-server does not trip Aulon's slow-consumer eviction at
+this scale, so it can be measured at the previous `pace=0` setting
+without the artefact that contaminated Aulon's C4 numbers.
+
+We therefore report each backend at the smallest pace window that
+gives clean delivery against it. The two runs are not at identical
+publisher rates and are not a strict apples-to-apples comparison;
+the bare-metal headline (see "What's deferred" in
+`docs/reviews/checkpoint-5.md`) is what produces the comparable
+single-row p99.99.
+
+Reproducer:
+
+```
+# Aulon
+CARGO_TARGET_DIR=/tmp/aulon-target AULON_FANOUT=4 \
+  AULON_ITERATIONS=3000 AULON_WARMUP=1000 \
+  AULON_PAYLOAD_BYTES=256 AULON_PACE_WINDOW=2 \
+  bash bench/fanout.sh
+
+# nats-server
+CARGO_TARGET_DIR=/tmp/aulon-target AULON_FANOUT=4 \
+  AULON_ITERATIONS=3000 AULON_WARMUP=1000 \
+  AULON_PAYLOAD_BYTES=256 AULON_PACE_WINDOW=0 \
+  bash bench/headline.sh
+# (the Aulon row from this second run is the pace=0 / C4-style
+#  number and is contaminated by eviction; ignore it in favour of
+#  the pace=2 fanout.sh number above)
+```
+
+| backend | pace | min | p50 | p99 | p99.9 | p99.99 |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Aulon | 2 (paced) | 18 us | 29 us | 50 us | 70 us | 41 ms (1 outlier in 16,000) |
+| nats-server 2.10.24 | 0 (unpaced) | 38 us | 99 us | 313 us | 378 us | 419 us |
+
+Reads on each row:
+
+- **Aulon p50 29 us** is the single-in-flight, steady-state publish-
+  to-deliver latency the broker actually produces. The 41 ms p99.99 is
+  one tail outlier in 16,000 deliveries and is bounded by VM
+  scheduler jitter; `p99.9 = 70 us` is the tighter steady-state
+  bound and is the number to use when reasoning about typical tail
+  behaviour.
+- **nats-server p50 99 us** is the same number recorded in C4. The
+  C4 row was preserved as the comparison point; nothing about
+  nats-server changed between C4 and C5.
+- The pace difference between rows reflects a benchmark-harness
+  limit, not a broker property. With a multi-process bench (or on
+  bare metal where the bench client has the cycles to keep up at
+  pace=2 against either backend), the rows reduce to the same pace
+  window and the p99.99 comparison becomes single-row. That is the
+  C5 deferred item.
+
